@@ -4,7 +4,7 @@ import { buildCards, unassigned, channelLabel, stateLabel } from './viewmodel.js
 import { fmtEur } from './calc.js';
 import { SHEET_LABEL } from '../config.js';
 
-export const store = { state: null, meta: null, ym: null, asOf: null, onlyOff: false };
+export const store = { state: null, meta: null, ym: null, asOf: null, onlyOff: false, role: null, code: null };
 
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -52,7 +52,7 @@ function channelHtml(c) {
 function cardHtml(card) {
   const main = card.channels.find(c => c.state === card.overall) || card.channels[0];
   const chip = main ? `<span class="chip ${card.overall}">${esc(stateLabel(card.overall, main.pct))}</span>` : '';
-  return `<button class="card" type="button" data-tab="${esc(card.tab)}">
+  return `<button class="card" type="button" data-tab="${esc(card.tab)}" aria-label="Apri ${esc(card.name)}">
       <div class="card-head"><h3>${esc(card.name)}</h3>${chip}</div>
       ${card.channels.map(channelHtml).join('')}
       ${kpiHtml(card.kpi7)}
@@ -125,7 +125,9 @@ function init() {
   $('who').addEventListener('click', async () => {
     try { (await import('./auth.js')).openLogin(); } catch (e) { console.error(e); }
   });
-  reload().catch((e) => { $('freshness').textContent = `Errore nel caricamento: ${e.message}`; });
+  reload()
+    .then(() => import('./auth.js').then(m => m.restore()))
+    .catch((e) => { $('freshness').textContent = `Errore nel caricamento: ${e.message}`; });
 }
 
 init();

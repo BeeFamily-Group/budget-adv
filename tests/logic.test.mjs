@@ -87,6 +87,11 @@ test('mese normalizzato anche se Google lo ha trasformato in data', () => {
   assert.equal(L.ymOf(''), '');
 });
 
+test('lo stato va in cache solo se sta nel limite di Apps Script', () => {
+  assert.equal(L.fitsCache('x'.repeat(45000)), true);
+  assert.equal(L.fitsCache('x'.repeat(100001)), false);
+});
+
 test('richieste da applicare', () => {
   const reqs = [
     { id: 'a', status: 'pending', apply_from: '2026-11-15' },

@@ -144,6 +144,11 @@ function ymOf(v) {
   return String(v || '').slice(0, 7);
 }
 
+// CacheService di Apps Script accetta valori fino a 100 KB.
+function fitsCache(str) {
+  return String(str).length <= 100000;
+}
+
 function dueRequests(requests, today) {
   return (requests || []).filter(function (r) {
     return r.status === 'pending' || (r.status === 'scheduled' && r.apply_from <= today);
@@ -155,6 +160,6 @@ if (typeof module !== 'undefined') {
     LAYOUT: LAYOUT, monthsList: monthsList, monthLabel: monthLabel, colLetter: colLetter,
     findBlocks: findBlocks, readMonths: readMonths, channelId: channelId, planCell: planCell,
     roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote,
-    spendWritable: spendWritable, newMetaRequest: newMetaRequest, dueRequests: dueRequests, ymOf: ymOf,
+    spendWritable: spendWritable, newMetaRequest: newMetaRequest, dueRequests: dueRequests, ymOf: ymOf, fitsCache: fitsCache,
   };
 }

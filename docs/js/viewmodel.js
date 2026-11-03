@@ -1,6 +1,6 @@
 // Dallo stato della web app e da meta.json ai dati che la pagina disegna.
 import {
-  activeWindow, elapsedActiveDays, expectedToDate, pacing, perDayToClose, kpis7, googleStale,
+  activeWindow, elapsedActiveDays, expectedToDate, pacing, perDayToClose, kpis7, googleStale, alertValues, closeSuggestion,
 } from './calc.js';
 
 export function channelLabel(title) {
@@ -143,4 +143,90 @@ export function unassigned(state, meta, ym, asOf) {
     const c = meta.campaigns.find(x => String(x.id) === id) || {};
     return { campaign_id: id, name: c.name || id, account_id: c.account_id || '', spent: value };
   });
+}
+
+// Data da cui applicare su Meta una modifica: oggi per il mese in corso, primo giorno attivo per un mese futuro.
+export function applyFrom(win, ym, today) {
+  if (ym === today.slice(0, 7)) return today;
+  return `${ym}-${String(win.startDay).padStart(2, '0')}`;
+}
+
+const ddmm = (d) => (d ? `${String(d).slice(8, 10)}/${String(d).slice(5, 7)}` : '');
+
+function requestStatus(state, channelId, ym) {
+  const r = state.requests
+    .filter(q => q.channel_id === channelId && q.ym === ym && q.status !== 'superseded')
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    .pop();
+  if (!r) return '';
+  if (r.status === 'pending') return `in attesa: ${r.eur} €/g`;
+  if (r.status === 'scheduled') return `su Meta dal ${ddmm(r.apply_from)}`;
+  if (r.status === 'applied') return `applicato il ${ddmm(r.updated_at || r.created_at)}`;
+  if (r.status === 'error') return `errore: ${r.result}`;
+  return r.status;
+}
+
+function prevMonth(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+}
+
+export function buildDetail(state, meta, tab, ym, asOf, role) {
+  const s = state.structures.find(x => x.tab === tab);
+  const currentYm = asOf.slice(0, 7);
+  const channels = s.channels.map(ch => {
+    const v = channelView(state, meta, ch, ym, asOf);
+    let alert = null;
+    if (v && meta.as_of && ch.kind === 'meta' && ym === currentYm && v.programmed > 0 && v.remaining > 0 && v.eur > 0
+        && Math.abs(v.dailyBudget - v.eur) / v.eur > 0.10) {
+      alert = alertValues({ programmed: v.programmed, spent: v.spent, metaDailyBudget: v.dailyBudget,
+                            remaining: v.remaining, activeDays: v.win.days });
+    }
+    return { ...v, alert, applyFrom: v ? applyFrom(v.win, ym, asOf.slice(0, 10)) : null };
+  });
+
+  const sum = (xs, f) => xs.reduce((a, x) => a + (f(x) || 0), 0);
+  const metaCh = channels.filter(c => c.kind === 'meta');
+  const googleCh = channels.filter(c => c.kind === 'google');
+  const metaM = { spend: Math.round(sum(metaCh, c => c.spent) * 100) / 100, leads: sum(metaCh, c => sum(c.daily, d => d.leads)) };
+  const googleM = { spend: sum(googleCh, c => c.spent), leads: sum(googleCh, c => c.leadsMtd) };
+  const total = { spend: metaM.spend + googleM.spend, leads: metaM.leads + googleM.leads };
+  total.cpl = total.leads > 0 ? Math.round((total.spend / total.leads) * 100) / 100 : null;
+
+  const yms = s.channels[0].months.map(m => m.ym);
+  const plan = yms.map(y => ({
+    ym: y,
+    channels: s.channels.map(ch => {
+      const m = ch.months.find(x => x.ym === y);
+      return { id: ch.id, kind: ch.kind, title: ch.title, eur: m.eur, days: m.days, proposal: m.proposal,
+               programmed: (m.eur || 0) * (m.days || 0), requestStatus: ch.kind === 'meta' ? requestStatus(state, ch.id, y) : '' };
+    }),
+  }));
+
+  let closing = null;
+  const prevYm = prevMonth(ym);
+  if (yms.includes(prevYm)) {
+    const lastDay = `${prevYm}-31`;
+    const rows = s.channels.map((ch, k) => {
+      const p = channelView(state, meta, ch, prevYm, lastDay < asOf ? lastDay : asOf);
+      const n = channels[k];
+      if (!p || (p.programmed === 0 && p.spent === 0)) return null;
+      return { id: ch.id, kind: ch.kind, title: ch.title, programmed: p.programmed, spent: p.spent,
+               delta: Math.round(p.spent - p.programmed),
+               suggestion: closeSuggestion({ programmed: p.programmed, spent: p.spent, nextProgrammed: n.programmed,
+                                             nextDays: n.days || 0, nextEur: n.eur || 0 }) };
+    }).filter(Boolean);
+    closing = { prevYm, channels: rows };
+  }
+
+  const notes = { francesco: [], marco: [], ambra: [] };
+  for (const n of state.notes.filter(x => x.tab === tab && x.ym === ym).sort((a, b) => b.ts.localeCompare(a.ts))) {
+    if (notes[n.author]) notes[n.author].push(n);
+  }
+
+  return {
+    tab, ym, channels, plan, closing, notes,
+    results: { month: { meta: metaM, google: googleM, total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf)[0].kpi7 },
+    can: { editMeta: role === 'francesco', editGoogle: role === 'marco', note: Boolean(role) },
+  };
 }

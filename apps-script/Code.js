@@ -91,9 +91,28 @@ function buildState() {
   };
 }
 
+var CACHE_KEY = 'state-v1';
+var CACHE_SECONDS = 300;   // le modifiche fatte a mano nello Sheet compaiono entro 5 minuti
+
+function cachedStateText() {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get(CACHE_KEY);
+  if (hit) return hit;
+  var text = JSON.stringify(buildState());
+  if (fitsCache(text)) cache.put(CACHE_KEY, text, CACHE_SECONDS);
+  return text;
+}
+
+function dropCache() {
+  CacheService.getScriptCache().remove(CACHE_KEY);
+}
+
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'state';
-  if (action === 'state') return json(buildState());
+  if (action === 'state') {
+    if (e.parameter.fresh) dropCache();
+    return ContentService.createTextOutput(cachedStateText()).setMimeType(ContentService.MimeType.JSON);
+  }
   return json({ ok: false, error: 'azione sconosciuta' });
 }
 
@@ -244,12 +263,14 @@ function doPost(e) {
     if (body.routine_key) {
       if (!h.routine || sha256(String(body.routine_key)) !== h.routine) return json({ ok: false, error: 'chiave non valida' });
       var ra = ROUTINE_ACTIONS[body.action];
+      if (body.action !== 'pendingRequests') dropCache();
       return json(ra ? ra(body) : { ok: false, error: 'azione sconosciuta' });
     }
     var userHashes = { francesco: h.francesco, marco: h.marco, ambra: h.ambra };
     var role = roleFromCode(body.code, userHashes, sha256);
     if (!role) return json({ ok: false, error: 'codice non valido' });
     var ua = USER_ACTIONS[body.action];
+    if (body.action !== 'whoami') dropCache();
     return json(ua ? ua(role, body) : { ok: false, error: 'azione sconosciuta' });
   } catch (err) {
     return json({ ok: false, error: String(err && err.message || err) });
