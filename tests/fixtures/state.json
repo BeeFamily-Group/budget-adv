@@ -1,0 +1,460 @@
+{
+ "ok": true,
+ "generated_at": "2026-11-15T05:10:00Z",
+ "structures": [
+  {
+   "tab": "Ciccio",
+   "channels": [
+    {
+     "id": "Ciccio|A",
+     "kind": "meta",
+     "title": "BUDGET FACEBOOK ADS",
+     "months": [
+      {
+       "ym": "2026-10",
+       "days": 31,
+       "eur": null,
+       "proposal": false
+      },
+      {
+       "ym": "2026-11",
+       "days": 30,
+       "eur": 120,
+       "proposal": false
+      },
+      {
+       "ym": "2026-12",
+       "days": 31,
+       "eur": 120,
+       "proposal": false
+      },
+      {
+       "ym": "2027-01",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-02",
+       "days": 28,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-03",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-04",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-05",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-06",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-07",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-08",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-09",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-10",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-11",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-12",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      }
+     ]
+    },
+    {
+     "id": "Ciccio|J",
+     "kind": "google",
+     "title": "BUDGET GOOGLE ADS",
+     "months": [
+      {
+       "ym": "2026-10",
+       "days": 31,
+       "eur": 40,
+       "proposal": false
+      },
+      {
+       "ym": "2026-11",
+       "days": 30,
+       "eur": 80,
+       "proposal": false
+      },
+      {
+       "ym": "2026-12",
+       "days": 31,
+       "eur": 80,
+       "proposal": false
+      },
+      {
+       "ym": "2027-01",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-02",
+       "days": 28,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-03",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-04",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-05",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-06",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-07",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-08",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-09",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-10",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-11",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-12",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "tab": "Color Perla Village",
+   "channels": [
+    {
+     "id": "Color Perla Village|A",
+     "kind": "meta",
+     "title": "BUDGET FACEBOOK ADS",
+     "months": [
+      {
+       "ym": "2026-10",
+       "days": 31,
+       "eur": null,
+       "proposal": false
+      },
+      {
+       "ym": "2026-11",
+       "days": 30,
+       "eur": 50,
+       "proposal": false
+      },
+      {
+       "ym": "2026-12",
+       "days": 31,
+       "eur": 50,
+       "proposal": false
+      },
+      {
+       "ym": "2027-01",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-02",
+       "days": 28,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-03",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-04",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-05",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-06",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-07",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-08",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-09",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-10",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-11",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-12",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "tab": "B612",
+   "channels": [
+    {
+     "id": "B612|A",
+     "kind": "meta",
+     "title": "BUDGET FACEBOOK ADS",
+     "months": [
+      {
+       "ym": "2026-10",
+       "days": 31,
+       "eur": null,
+       "proposal": false
+      },
+      {
+       "ym": "2026-11",
+       "days": 30,
+       "eur": 30,
+       "proposal": false
+      },
+      {
+       "ym": "2026-12",
+       "days": 31,
+       "eur": 30,
+       "proposal": false
+      },
+      {
+       "ym": "2027-01",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-02",
+       "days": 28,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-03",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-04",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-05",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-06",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-07",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-08",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-09",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-10",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-11",
+       "days": 30,
+       "eur": null,
+       "proposal": true
+      },
+      {
+       "ym": "2027-12",
+       "days": 31,
+       "eur": null,
+       "proposal": true
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [],
+ "requests": [],
+ "days": [],
+ "google": [
+  {
+   "ts": "2026-11-12T10:00:00Z",
+   "channel_id": "Ciccio|J",
+   "date": "2026-11-12",
+   "spent_mtd": 1050,
+   "leads_mtd": 64,
+   "daily_budget": 80,
+   "active": true,
+   "author": "marco"
+  },
+  {
+   "ts": "2026-10-31T10:00:00Z",
+   "channel_id": "Ciccio|J",
+   "date": "2026-10-31",
+   "spent_mtd": 1380,
+   "leads_mtd": 70,
+   "daily_budget": 40,
+   "active": true,
+   "author": "marco"
+  }
+ ],
+ "mapping": [
+  {
+   "account_id": "421004342260012",
+   "campaign_id": "s27",
+   "campaign_name": "SUMMER_2027",
+   "channel_id": "Ciccio|A"
+  },
+  {
+   "account_id": "1576344015714351",
+   "campaign_id": "p1",
+   "campaign_name": "Perla Village - Estate 2027",
+   "channel_id": "Color Perla Village|A"
+  },
+  {
+   "account_id": "433491253104777",
+   "campaign_id": "b1",
+   "campaign_name": "Mercatini",
+   "channel_id": "B612|A"
+  },
+  {
+   "account_id": "1576344015714351",
+   "campaign_id": "x9",
+   "campaign_name": "Color Flex Pay - Rete",
+   "channel_id": ""
+  }
+ ]
+}
