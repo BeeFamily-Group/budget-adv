@@ -19,7 +19,7 @@ def today_rome():
         return (datetime.datetime.utcnow() + datetime.timedelta(hours=1)).date()
 
 
-def build_plan(accounts, today=None):
+def build_plan(accounts, today=None, daily=True):
     today = today or today_rome()
     until = today - datetime.timedelta(days=1)
     first_this = until.replace(day=1)
@@ -34,6 +34,8 @@ def build_plan(accounts, today=None):
         calls.append({"key": acc + "_adsets", "args": {
             "ad_account_id": acc, "level": "adset", "limit": 500, "filtering": active,
             "fields": ["id", "campaign_id", "effective_status", "daily_budget"]}})
+        if not daily:
+            continue
         calls.append({"key": acc + "_daily", "args": {
             "ad_account_id": acc, "level": "campaign", "limit": 1000, "time_range": rng, "time_increment": "1",
             "filtering": [{"field": "amount_spent", "operator": "GREATER_THAN", "value": ["0"]}],

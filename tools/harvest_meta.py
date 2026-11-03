@@ -102,7 +102,7 @@ def harvest(plan, paths, raw_dir):
     accounts = sorted({c["args"]["ad_account_id"] for c in plan["calls"]})
     ok, failed = [], []
     for acc in accounts:
-        keys = [acc + s for s in ("_campaigns", "_adsets", "_daily")]
+        keys = [c["key"] for c in plan["calls"] if c["args"]["ad_account_id"] == acc]
         missing = [k for k in keys if k not in rows]
         if missing:
             msg = "; ".join(errors.get(k, "chiamata mancante: " + k) for k in missing)

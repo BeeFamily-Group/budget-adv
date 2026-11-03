@@ -87,3 +87,9 @@ class Spend(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FreshRead(unittest.TestCase):
+    def test_plan_without_daily(self):
+        p = meta_plan.build_plan({"421004342260012": "Ciccio"}, today=datetime.date(2026, 11, 15), daily=False)
+        self.assertEqual([c["key"] for c in p["calls"]], ["421004342260012_campaigns", "421004342260012_adsets"])
