@@ -1,0 +1,6 @@
+raw/
+*.local.*
+.superpowers/
+apps-script/.clasp.json
+node_modules/
+__pycache__/
