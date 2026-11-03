@@ -1,1 +1,1 @@
-{"type":"module","scripts":{"test":"node --test tests/"}}
+{"type":"module","scripts":{"test":"node --test tests/ && python3 -I -m unittest discover -s tools/tests"}}
