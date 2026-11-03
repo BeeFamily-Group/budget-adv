@@ -80,6 +80,13 @@ test('richiesta per mese futuro resta programmata', () => {
   assert.equal(r.request.apply_from, '2026-12-01');
 });
 
+test('mese normalizzato anche se Google lo ha trasformato in data', () => {
+  assert.equal(L.ymOf('2026-11'), '2026-11');
+  assert.equal(L.ymOf(new Date(Date.UTC(2026, 10, 1))), '2026-11');
+  assert.equal(L.ymOf('2026-11-01'), '2026-11');
+  assert.equal(L.ymOf(''), '');
+});
+
 test('richieste da applicare', () => {
   const reqs = [
     { id: 'a', status: 'pending', apply_from: '2026-11-15' },

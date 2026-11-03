@@ -4,3 +4,4 @@ raw/
 apps-script/.clasp.json
 node_modules/
 __pycache__/
+.clasp.json
