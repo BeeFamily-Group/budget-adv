@@ -230,6 +230,18 @@ var ROUTINE_ACTIONS = {
     return { ok: true };
   },
   writeSpend: function (b) { return writeSpendCell('routine', 'writeSpend', b.channel_id, b.ym, b.value); },
+  writeSpendBatch: function (b) {
+    var out = { ok: true, written: 0, skipped: [], errors: [] };
+    (b.items || []).forEach(function (it) {
+      try {
+        var r = writeSpendCell('routine', 'writeSpend', it.channel_id, it.ym, it.value);
+        if (r.skipped) out.skipped.push(it.channel_id + ' ' + it.ym); else out.written++;
+      } catch (err) {
+        out.errors.push(it.channel_id + ' ' + it.ym + ': ' + err.message);
+      }
+    });
+    return out;
+  },
   upsertMapping: function (b) {
     var sh = SpreadsheetApp.getActive().getSheetByName('MAPPA');
     var known = {};
