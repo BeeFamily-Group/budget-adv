@@ -142,3 +142,10 @@ test('nessun avviso piano/Meta se i dati Meta non ci sono ancora', () => {
   const d = buildDetail(withReq, empty, 'Ciccio', '2026-11', '2026-11-14', 'francesco');
   assert.equal(d.channels.find(c => c.kind === 'meta').alert, null);
 });
+
+import { staleAccounts } from '../docs/js/viewmodel.js';
+
+test('avviso dati fermi solo per account collegati a una scheda', () => {
+  const m2 = { ...meta, accounts: { ...meta.accounts, '608324351982441': { ok: false, error: 'not enabled', last_ok: null } } };
+  assert.deepEqual(staleAccounts(state, m2), [{ account_id: '433491253104777', name: 'B612', last_ok: '2026-11-13' }]);
+});

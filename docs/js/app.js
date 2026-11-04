@@ -1,6 +1,6 @@
 // Schermata principale: mesi, schede per struttura, campagne da assegnare.
 import { getState, getMeta, isDemo } from './api.js';
-import { buildCards, unassigned, channelLabel, stateLabel } from './viewmodel.js';
+import { buildCards, unassigned, channelLabel, stateLabel, staleAccounts } from './viewmodel.js';
 import { fmtEur } from './calc.js';
 import { SHEET_LABEL } from '../config.js';
 
@@ -60,21 +60,15 @@ function cardHtml(card) {
     </button>`;
 }
 
-function accountName(accountId) {
-  const camp = store.meta.campaigns.find(c => c.account_id === accountId);
-  const row = camp && store.state.mapping.find(r => String(r.campaign_id) === String(camp.id) && r.channel_id);
-  return row ? row.channel_id.split('|')[0] : accountId;
-}
-
 export function render() {
   const { state, meta, ym, asOf } = store;
   const yms = state.structures[0]?.channels[0]?.months.map(m => m.ym) || [];
   $('months').innerHTML = yms.map(y => `<button type="button" data-ym="${y}" aria-pressed="${y === ym}">${monthShort(y)}</button>`).join('');
   $('freshness').textContent = `Meta aggiornato al ${ddmm(asOf)} · Google inserito da Marco${isDemo() ? ' · DATI DI PROVA' : (SHEET_LABEL ? ` · ${SHEET_LABEL}` : '')}`;
 
-  const stale = Object.entries(meta.accounts || {}).filter(([, a]) => !a.ok);
+  const stale = staleAccounts(state, meta);
   $('banners').innerHTML = stale.length
-    ? `<div class="banner">Dati Meta fermi per ${stale.map(([id, a]) => `<b>${esc(accountName(id))}</b> (ultimo dato ${ddmm(a.last_ok)})`).join(', ')}.</div>`
+    ? `<div class="banner">Dati Meta fermi per ${stale.map(a => `<b>${esc(a.name)}</b> (ultimo dato ${ddmm(a.last_ok)})`).join(', ')}.</div>`
     : '';
 
   const cards = buildCards(state, meta, ym, asOf);

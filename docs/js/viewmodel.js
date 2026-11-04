@@ -230,3 +230,17 @@ export function buildDetail(state, meta, tab, ym, asOf, role) {
     can: { editMeta: role === 'francesco', editGoogle: role === 'marco', note: Boolean(role) },
   };
 }
+
+// Account Meta non letti, solo se hanno campagne collegate a una scheda (es. Sardinia ha solo Google: niente avviso).
+export function staleAccounts(state, meta) {
+  const tabOf = new Map();
+  for (const r of state.mapping) {
+    if (!r.channel_id) continue;
+    const c = meta.campaigns.find(x => String(x.id) === String(r.campaign_id));
+    const acc = c ? c.account_id : String(r.account_id);
+    if (!tabOf.has(acc)) tabOf.set(acc, r.channel_id.split('|')[0]);
+  }
+  return Object.entries(meta.accounts || {})
+    .filter(([id, a]) => !a.ok && tabOf.has(id))
+    .map(([id, a]) => ({ account_id: id, name: tabOf.get(id), last_ok: a.last_ok }));
+}
