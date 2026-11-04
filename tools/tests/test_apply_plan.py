@@ -45,6 +45,11 @@ class PlanChanges(unittest.TestCase):
         ch = apply_plan.plan_changes(req, [camp("merc", 25, level="adset", adsets=adsets)], MAPPING)
         self.assertEqual([(c["entity_type"], c["entity_id"], c["new"]) for c in ch], [("ad_set", "a1", 50)])
 
+    def test_lifetime_budget_never_touched(self):
+        req = {"id": "r5", "channel_id": "Helios|A", "eur": 60, "status": "pending"}
+        ch = apply_plan.plan_changes(req, [camp("eng", 30), camp("ret", 0)], MAPPING)
+        self.assertEqual([(c["entity_id"], c["new"]) for c in ch], [("eng", 60)])
+
     def test_idempotent(self):
         for status in ("applied", "superseded", "error"):
             req = {"id": "r4", "channel_id": "Helios|A", "eur": 60, "status": status}

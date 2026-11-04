@@ -32,8 +32,8 @@ def _entities(campaigns, ids):
             for a in c.get("adsets", []):
                 if a.get("status") == "ACTIVE" and (a.get("daily_budget") or 0) > 0:
                     ents.append(("ad_set", str(a["id"]), a["daily_budget"]))
-        else:
-            ents.append(("campaign", str(c["id"]), c.get("daily_budget") or 0))
+        elif (c.get("daily_budget") or 0) > 0:  # senza budget giornaliero (es. budget totale): mai toccata
+            ents.append(("campaign", str(c["id"]), c["daily_budget"]))
     return ents
 
 
