@@ -3,6 +3,8 @@ import argparse
 import datetime
 import json
 import os
+import secrets
+import string
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -17,6 +19,12 @@ def today_rome():
         return datetime.datetime.now(ZoneInfo("Europe/Rome")).date()
     except Exception:  # Python senza zoneinfo: UTC+1 basta per decidere il giorno
         return (datetime.datetime.utcnow() + datetime.timedelta(hours=1)).date()
+
+
+def new_run_id():
+    """client_conversation_id della run: le letture con un id diverso (altre run) non vengono usate."""
+    abc = string.ascii_letters + string.digits
+    return "".join(secrets.choice(abc) for _ in range(20))
 
 
 def build_plan(accounts, today=None, daily=True):
@@ -40,7 +48,8 @@ def build_plan(accounts, today=None, daily=True):
             "ad_account_id": acc, "level": "campaign", "limit": 1000, "time_range": rng, "time_increment": "1",
             "filtering": [{"field": "amount_spent", "operator": "GREATER_THAN", "value": ["0"]}],
             "fields": ["id", "name", "amount_spent", "lead"]}})
-    return {"as_of": until.isoformat(), "since": since.isoformat(), "until": until.isoformat(), "calls": calls}
+    return {"run_id": new_run_id(), "as_of": until.isoformat(), "since": since.isoformat(), "until": until.isoformat(),
+            "calls": calls}
 
 
 def main():

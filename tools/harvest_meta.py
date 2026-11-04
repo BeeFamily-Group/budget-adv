@@ -2,6 +2,10 @@
 
 Nessun numero passa a mano: o arriva da un risultato di ads_get_ad_entities con i parametri del piano,
 oppure per quell'account si scrive <account>_error.txt e la dashboard tiene i dati del giorno prima.
+
+Contano solo le chiamate con client_conversation_id = run_id del piano (mai letture di altre run), e una lettura
+vale solo se completa: una pagina con pagination.next_cursor non seguita, o una pagina successiva in errore,
+mette l'account in errore.
 """
 import argparse
 import glob
@@ -63,10 +67,20 @@ def _parse(text):
     return ents, None
 
 
+def _has_more(text):
+    try:
+        d = json.loads(text)
+    except (TypeError, ValueError):
+        return False
+    return isinstance(d, dict) and bool((d.get("pagination") or {}).get("next_cursor"))
+
+
 def harvest(plan, paths, raw_dir):
     wanted = {c["key"]: {k: _norm(c["args"].get(k)) for k in MATCH_KEYS} for c in plan["calls"]}
+    run_id = plan.get("run_id")
     rows = {}
     errors = {}
+    incomplete = {}
     for path in paths:
         uses = {}
         for line in open(path, encoding="utf-8", errors="ignore"):
@@ -84,28 +98,40 @@ def harvest(plan, paths, raw_dir):
                     continue
                 if b.get("type") == "tool_use" and b.get("name", "").endswith("ads_get_ad_entities"):
                     inp = b.get("input") or {}
+                    if run_id and inp.get("client_conversation_id") != run_id:
+                        continue  # lettura di un'altra run: mai mescolarla con questa
                     sig = {k: _norm(inp.get(k)) for k in MATCH_KEYS}
                     for key, w in wanted.items():
                         if sig == w:
-                            uses[b["id"]] = key
+                            uses[b["id"]] = (key, bool(inp.get("cursor")))
                 elif b.get("type") == "tool_result" and b.get("tool_use_id") in uses:
-                    key = uses[b["tool_use_id"]]
-                    ents, err = _parse(_result_text(b))
+                    key, next_page = uses[b["tool_use_id"]]
+                    text = _result_text(b)
+                    ents, err = _parse(text)
                     if err:
                         errors[key] = err
-                    else:
-                        errors.pop(key, None)
-                        rows.setdefault(key, {})
-                        for e in ents:  # pagine e ripetizioni: vince l'ultima riga con la stessa chiave
-                            rows[key][(str(e.get("id")), e.get("date_start"))] = e
+                        if next_page:
+                            incomplete[key] = True   # pagina successiva fallita: lettura incompleta
+                        else:
+                            rows.pop(key, None)      # prima pagina fallita: un nuovo tentativo riparte da zero
+                            incomplete.pop(key, None)
+                        continue
+                    errors.pop(key, None)
+                    if not next_page:
+                        rows[key] = {}               # prima pagina: la lista riparte da qui
+                    rows.setdefault(key, {})
+                    for e in ents:  # stessa entita' e stesso giorno: vince l'ultima riga
+                        rows[key][(str(e.get("id")), e.get("date_start"))] = e
+                    incomplete[key] = _has_more(text)
     os.makedirs(raw_dir, exist_ok=True)
     accounts = sorted({c["args"]["ad_account_id"] for c in plan["calls"]})
     ok, failed = [], []
     for acc in accounts:
         keys = [c["key"] for c in plan["calls"] if c["args"]["ad_account_id"] == acc]
-        missing = [k for k in keys if k not in rows]
+        missing = [k for k in keys if k not in rows or incomplete.get(k)]
         if missing:
-            msg = "; ".join(errors.get(k, "chiamata mancante: " + k) for k in missing)
+            msg = "; ".join(errors.get(k) or ("pagine mancanti: " + k if k in rows else "chiamata mancante: " + k)
+                            for k in missing)
             with open(os.path.join(raw_dir, acc + "_error.txt"), "w") as f:
                 f.write(msg)
             failed.append(acc)

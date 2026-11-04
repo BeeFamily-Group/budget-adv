@@ -2,7 +2,8 @@ Routine oraria della dashboard budget ADV BeeFamily: applica su Meta le modifich
 Si cambia SOLO il budget giornaliero delle entità indicate dallo script. Mai stato, targeting, nomi, creatività, mai creare o cancellare.
 
 Cartella: "$HOME/Desktop/CLAUDE CODE/BEEFAMILY/DASHBOARD BUDGET/budget-adv" (sempre tra virgolette).
-Campi di servizio da aggiungere a OGNI chiamata Meta: client_conversation_id (20 caratteri alfanumerici, lo stesso per tutta la run),
+Campi di servizio da aggiungere a OGNI chiamata Meta: client_conversation_id = il "run_id" stampato al punto 1
+(è anche in raw_hourly/plan.json; sempre quello, per tutta la run: lo script usa solo le letture con questo id),
 client_model, advertiser_job "update_existing_campaigns", scheduled_task_run true.
 
 1. Esegui: cd "$HOME/Desktop/CLAUDE CODE/BEEFAMILY/DASHBOARD BUDGET/budget-adv" && python3 -I tools/hourly.py pending
@@ -10,6 +11,7 @@ client_model, advertiser_job "update_existing_campaigns", scheduled_task_run tru
 
 2. Leggi raw_hourly/plan.json e per ogni elemento di "calls" chiama `ads_get_ad_entities` con ESATTAMENTE i suoi "args"
    (più i campi di servizio, reporting_purpose ["entity_lookup"], include_additional_context false).
+   Se la risposta contiene pagination.next_cursor, ripeti la stessa chiamata aggiungendo cursor finché non ce ne sono più.
 
 3. Esegui: cd "$HOME/Desktop/CLAUDE CODE/BEEFAMILY/DASHBOARD BUDGET/budget-adv" && python3 -I tools/hourly.py changes
    Per ogni richiesta stampata:

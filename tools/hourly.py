@@ -32,7 +32,7 @@ def pending():
     for name, obj in (("pending", reqs), ("state", state), ("plan", plan)):
         with open(os.path.join(RAW, name + ".json"), "w") as f:
             json.dump(obj, f, ensure_ascii=False, indent=1)
-    print(json.dumps({"richieste": len(reqs), "letture_meta": len(plan["calls"]),
+    print(json.dumps({"richieste": len(reqs), "letture_meta": len(plan["calls"]), "run_id": plan["run_id"],
                       "dettaglio": [{"id": r["id"], "canale": r["channel_id"], "mese": r["ym"], "eur": r["eur"]} for r in reqs]},
                      ensure_ascii=False))
 
