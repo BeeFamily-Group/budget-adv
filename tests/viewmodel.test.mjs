@@ -231,3 +231,26 @@ test('Google fermo si misura da oggi, non dalla data dei dati Meta', () => {
   assert.equal(card('2026-11-15').channels[1].stale, false);
   assert.equal(card('2026-11-25').channels[1].stale, true);
 });
+
+const withMonth = (st, tab, kind, ym, patch) => ({ ...st, structures: st.structures.map(s => s.tab !== tab ? s : {
+  ...s, channels: s.channels.map(c => c.kind !== kind ? c : { ...c, months: c.months.map(m => m.ym === ym ? { ...m, ...patch } : m) }),
+}) });
+
+test('Spesa Effettiva dello Sheet diversa dallo speso calcolato: si segnala', () => {
+  const diff = withMonth(state, 'Ciccio', 'meta', '2026-11', { sheet_spent: 1000 });
+  assert.equal(buildCards(diff, meta, '2026-11', '2026-11-14').find(c => c.tab === 'Ciccio').channels[0].sheetMismatch, 1000);
+  const same = withMonth(state, 'Ciccio', 'meta', '2026-11', { sheet_spent: 1142 });
+  assert.equal(buildCards(same, meta, '2026-11', '2026-11-14').find(c => c.tab === 'Ciccio').channels[0].sheetMismatch, null);
+});
+
+test('etichette giuste: Google senza numeri, mese non iniziato, spesa prima dei giorni attivi', () => {
+  const noGoogle = { ...state, google: [] };
+  const g = buildCards(noGoogle, meta, '2026-11', '2026-11-14').find(c => c.tab === 'Ciccio').channels[1];
+  assert.equal(g.state, 'nodata');
+  assert.equal(stateLabel(g.state, g.pct), 'numeri da inserire');
+  const dec = buildCards(state, meta, '2026-12', '2026-11-14').find(c => c.tab === 'Ciccio').channels[0];
+  assert.equal(stateLabel(dec.state, dec.pct), 'non ancora iniziato');
+  const late = { ...state, days: [{ channel_id: 'Ciccio|A', ym: '2026-11', start_day: 20 }] };
+  const early = buildCards(late, meta, '2026-11', '2026-11-14').find(c => c.tab === 'Ciccio').channels[0];
+  assert.equal(stateLabel(early.state, early.pct), 'spesa prima dei giorni attivi');
+});

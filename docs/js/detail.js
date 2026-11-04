@@ -98,6 +98,9 @@ function channelBox(c, d) {
   rows.push(['Piano €/giorno', `${fmtEur(c.eur || 0)} × ${c.days || 0} gg`]);
   if (c.perDay !== null && c.programmed > 0) rows.push(['Per chiudere il mese servono', `${fmtEur(c.perDay)}/g`]);
   if (c.dataStaleSince) rows.push(['Dati Meta', staleText(c.dataStaleSince)]);
+  if (c.sheetMismatch !== null && c.sheetMismatch !== undefined) {
+    rows.push(['Spesa Effettiva nello Sheet', `${fmtEur(c.sheetMismatch)} · diversa da ${fmtEur(c.spent)} (inserita a mano?)`]);
+  }
 
   let alert = '';
   if (c.alert) {

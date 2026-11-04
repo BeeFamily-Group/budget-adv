@@ -16,13 +16,16 @@ export function channelLabel(title) {
 
 export function stateLabel(state, pct) {
   if (state === 'ok') return 'in linea';
+  if (state === 'nodata') return 'numeri da inserire';
+  if (state === 'notyet') return 'non ancora iniziato';
+  if (state === 'early') return 'spesa prima dei giorni attivi';
   if (state === 'under') return `sotto −${Math.abs(pct)}%`;
   if (state === 'over') return pct === null ? 'spesa senza budget' : `sopra +${pct}%`;
   return 'nessun budget';
 }
 
 export const COLOR_CAVEAT ='Lead Color gonfiati: arrivano a coppie (doppio invio browser + server)';
-const RANK = { over: 3, under: 2, ok: 1, none: 0 };
+const RANK = { over: 3, early: 3, under: 2, ok: 1, nodata: 0, notyet: 0, none: 0 };
 const round2 = (n) => Math.round(n * 100) / 100;
 
 // Una riga MAPPA vale per il canale se ha il suo id e, quando c'è, lo stesso titolo del blocco (righe vecchie senza titolo: valgono).
@@ -101,13 +104,14 @@ export function channelView(state, meta, ch, ym, asOf, today = asOf) {
   let spent = 0;
   let spentAsOf = asOf;
   let extra;
+  let g = null;
   if (ch.kind === 'meta') {
     const s = metaSpent(meta, state.mapping, ch, ym, asOf);
     spent = s.spent;
     extra = { dailyBudget: s.dailyBudget, activeCampaigns: s.activeCampaigns, daily: s.daily,
               updatedOn: null, stale: false, dataStaleSince: staleSince(meta, state.mapping, ch) };
   } else {
-    const g = latestGoogle(state.google, ch.id, ym);
+    g = latestGoogle(state.google, ch.id, ym);
     spent = g ? Number(g.spent_mtd) : 0;
     spentAsOf = g ? String(g.date) : null;
     extra = { dailyBudget: g ? Number(g.daily_budget) : null, activeCampaigns: g ? (g.active ? 1 : 0) : null,
@@ -116,10 +120,18 @@ export function channelView(state, meta, ch, ym, asOf, today = asOf) {
   }
   const elapsed = spentAsOf ? elapsedActiveDays(win, ym, spentAsOf) : 0;
   const expected = expectedToDate(programmed, elapsed, win.days);
-  const pace = programmed === 0 && spent === 0 ? { state: 'none', pct: null } : pacing(spent, expected);
+  let pace;
+  if (programmed === 0 && spent === 0) pace = { state: 'none', pct: null };
+  else if (ch.kind === 'google' && !g && programmed > 0 && ym <= today.slice(0, 7)) pace = { state: 'nodata', pct: null };
+  else if (programmed > 0 && !(expected > 0)) pace = { state: spent > 0 ? 'early' : 'notyet', pct: null };
+  else pace = pacing(spent, expected);
+  // Spesa Effettiva dello Sheet diversa da quella calcolata (inserita a mano, per esempio dalle fatture)
+  const sheet = m.sheet_spent;
+  const sheetMismatch = sheet !== null && sheet !== undefined && ym <= today.slice(0, 7)
+    && Math.abs(sheet - spent) > Math.max(5, spent * 0.02) ? sheet : null;
   return {
     id: ch.id, kind: ch.kind, title: ch.title, eur: m.eur, days: m.days, proposal: m.proposal, win,
-    programmed, spent, expected, state: pace.state, pct: pace.pct,
+    programmed, spent, expected, state: pace.state, pct: pace.pct, sheetMismatch,
     perDay: perDayToClose(programmed, spent, win.days - elapsed), remaining: win.days - elapsed,
     ...extra,
   };

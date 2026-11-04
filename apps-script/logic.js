@@ -69,6 +69,7 @@ function readMonths(grid, bg, col) {
       ym: ym,
       days: num(row[col]),
       eur: num(row[col + 1]),
+      sheet_spent: num(row[col + 3]),   // Spesa Effettiva: scritta dalla routine, da Marco o a mano
       proposal: String(bgRow[col + 1] || '').toLowerCase() === PROPOSAL_BG,
     };
   });

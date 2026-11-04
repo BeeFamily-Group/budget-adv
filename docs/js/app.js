@@ -44,6 +44,7 @@ function channelHtml(c) {
   const flags = [];
   if (c.dataStaleSince) flags.push(`dati Meta ${staleText(c.dataStaleSince)}`);
   if (c.kind === 'google' && c.stale && c.programmed > 0) flags.push('Google non aggiornato da più di 7 giorni');
+  if (c.sheetMismatch !== null && c.sheetMismatch !== undefined) flags.push(`nello Sheet ${fmtEur(c.sheetMismatch)}`);
   return `<div>
       <div class="ch-row"><span>${esc(channelLabel(c.title))} <b>${fmtEur(c.spent)}</b> / ${fmtEur(c.programmed)}</span><span>${esc(right)}</span></div>
       ${barHtml(c)}
@@ -81,7 +82,7 @@ export function render() {
     : '');
 
   const cards = buildCards(state, meta, ym, asOf, store.today);
-  const off = cards.filter(c => c.overall === 'under' || c.overall === 'over');
+  const off = cards.filter(c => c.overall === 'under' || c.overall === 'over' || c.overall === 'early');
   const shown = store.onlyOff ? off : cards;
   $('count').textContent = `${cards.length} strutture · ${off.length} fuori ritmo`;
   $('cards').innerHTML = shown.length ? shown.map(cardHtml).join('') : '<p class="empty">Nessuna struttura fuori ritmo in questo mese.</p>';

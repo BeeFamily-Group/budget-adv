@@ -163,3 +163,11 @@ test('esito di una richiesta sostituita durante la run: resta "sostituita"', () 
   assert.equal(L.resultStatus('superseded', 'applied'), 'superseded');
   assert.equal(L.resultStatus('superseded', 'error'), 'superseded');
 });
+
+test('lo stato legge anche la Spesa Effettiva dello Sheet', () => {
+  const grid = fx.values.map(r => r.slice());
+  grid[15][4] = 1000;   // Novembre 2026, colonna Spesa Effettiva del blocco Meta
+  const m = L.readMonths(grid, fx.bg, 1);
+  assert.equal(m[1].sheet_spent, 1000);
+  assert.equal(m[2].sheet_spent, null);
+});
