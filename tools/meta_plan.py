@@ -38,7 +38,9 @@ def build_plan(accounts, today=None, daily=True, targeting=()):
     today = today or today_rome()
     until = today - datetime.timedelta(days=1)
     first_this = until.replace(day=1)
-    since = (first_this - datetime.timedelta(days=1)).replace(day=1)
+    first_prev = (first_this - datetime.timedelta(days=1)).replace(day=1)
+    # due mesi prima del mese di ieri: storico di 2-3 mesi per il grafico dell'andamento
+    since = (first_prev - datetime.timedelta(days=1)).replace(day=1)
     rng = json.dumps({"since": since.isoformat(), "until": until.isoformat()}, separators=(",", ":"))
     active = [{"field": "effective_status", "operator": "IN", "value": ["ACTIVE"]}]
     calls = []

@@ -15,16 +15,16 @@ import spend  # noqa: E402
 class Plan(unittest.TestCase):
     def test_dates_and_calls(self):
         p = meta_plan.build_plan({"421004342260012": "Ciccio"}, today=datetime.date(2026, 11, 15))
-        self.assertEqual((p["as_of"], p["since"], p["until"]), ("2026-11-14", "2026-10-01", "2026-11-14"))
+        self.assertEqual((p["as_of"], p["since"], p["until"]), ("2026-11-14", "2026-09-01", "2026-11-14"))  # 2 mesi prima: storico per il grafico
         keys = [c["key"] for c in p["calls"]]
         self.assertEqual(keys, ["421004342260012_campaigns", "421004342260012_adsets", "421004342260012_daily"])
         daily = p["calls"][2]["args"]
         self.assertEqual(daily["time_increment"], "1")
-        self.assertEqual(json.loads(daily["time_range"]), {"since": "2026-10-01", "until": "2026-11-14"})
+        self.assertEqual(json.loads(daily["time_range"]), {"since": "2026-09-01", "until": "2026-11-14"})
 
     def test_first_of_january(self):
         p = meta_plan.build_plan({}, today=datetime.date(2027, 1, 1))
-        self.assertEqual((p["since"], p["until"]), ("2026-11-01", "2026-12-31"))  # mese di ieri (dic) + precedente (nov)
+        self.assertEqual((p["since"], p["until"]), ("2026-10-01", "2026-12-31"))  # mese di ieri (dic) + i due prima
 
 
 def tool_use(uid, args, run_id=None):
