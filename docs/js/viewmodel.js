@@ -24,7 +24,6 @@ export function stateLabel(state, pct) {
   return 'nessun budget';
 }
 
-export const COLOR_CAVEAT ='Lead Color gonfiati: arrivano a coppie (doppio invio browser + server)';
 const RANK = { over: 3, early: 3, under: 2, ok: 1, nodata: 0.6, notyet: 0.5, none: 0 };
 const round2 = (n) => Math.round(n * 100) / 100;
 
@@ -85,6 +84,39 @@ export function macLate(asOf, today) {
   const day = 86400000;
   const late = Math.round((Date.parse(today) - day - Date.parse(asOf)) / day);
   return late > 0 ? late : 0;
+}
+
+// Ricerca: senza accenti e maiuscole, tutte le parole cercate in qualsiasi ordine.
+const fold = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export function matchQuery(name, q) {
+  const n = fold(name);
+  return fold(q).split(/\s+/).filter(Boolean).every(w => n.includes(w));
+}
+
+// Spesa e lead Meta giorno per giorno delle strutture indicate (campagne assegnate), fino ad asOf, giorni vuoti a zero.
+export function trendDaily(state, meta, tabs, asOf) {
+  const want = new Set(tabs);
+  const ids = new Set();
+  for (const s of state.structures) {
+    if (!want.has(s.tab)) continue;
+    for (const ch of s.channels) if (ch.kind === 'meta') mappedIds(state.mapping, ch).forEach(id => ids.add(id));
+  }
+  const by = new Map();
+  for (const r of meta.daily || []) {
+    if (!ids.has(String(r.campaign_id)) || r.date > asOf) continue;
+    const x = by.get(r.date) || { spend: 0, leads: 0 };
+    x.spend += r.spend; x.leads += r.leads;
+    by.set(r.date, x);
+  }
+  if (!by.size) return [];
+  const out = [];
+  const day = 86400000;
+  for (let t = Date.parse(`${[...by.keys()].sort()[0]}T00:00:00Z`); t <= Date.parse(`${asOf}T00:00:00Z`); t += day) {
+    const date = new Date(t).toISOString().slice(0, 10);
+    const x = by.get(date) || { spend: 0, leads: 0 };
+    out.push({ date, spend: round2(x.spend), leads: x.leads });
+  }
+  return out;
 }
 
 function withOverrides(state, ch) {
@@ -160,7 +192,6 @@ export function buildCards(state, meta, ym, asOf, today = asOf) {
       overall,
       channels,
       kpi7: hasMeta ? kpis7([...allDaily.values()], asOf) : null,
-      caveat: s.tab.startsWith('Color ') ? COLOR_CAVEAT : null,
     };
   });
 }
@@ -245,8 +276,19 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
       const months = withOverrides(state, ch);
       const k = months.findIndex(x => x.ym === y);
       const m = months[k];
+      // speso reale del mese: Meta dai dati giornalieri, Google dall'ultimo aggiornamento di Marco;
+      // fuori da quei dati vale la Spesa Effettiva dello Sheet; mesi futuri: nessun valore
+      let spent = null;
+      if (y <= today.slice(0, 7)) {
+        let computed = null;
+        if (ch.kind === 'meta') { const sp = metaSpent(meta, state.mapping, ch, y, asOf).spent; computed = sp > 0 ? sp : null; }
+        else { const g = latestGoogle(state.google, ch.id, y); computed = g ? Number(g.spent_mtd) : null; }
+        spent = computed ?? m.sheet_spent ?? (y === today.slice(0, 7) ? 0 : null);
+      }
+      const programmed = (m.eur || 0) * (m.days || 0);
       const row = { id: ch.id, kind: ch.kind, title: ch.title, eur: m.eur, days: m.days, proposal: m.proposal,
-               programmed: (m.eur || 0) * (m.days || 0), requestStatus: ch.kind === 'meta' ? requestStatus(state, ch.id, y) : '',
+               programmed, spent, spentPct: spent !== null && programmed > 0 ? Math.round((spent / programmed) * 100) : null,
+               requestStatus: ch.kind === 'meta' ? requestStatus(state, ch.id, y) : '',
                win: activeWindow(months, k), startDayCustom: Boolean(m.start_day),
                openRequest: ch.kind === 'meta' ? openRequest(state, ch.id, y) : null };
       // richiesta programmata con una data che non torna piu' con Giorni / "dal giorno" (cambiati anche a mano nello Sheet)

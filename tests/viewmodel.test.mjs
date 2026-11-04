@@ -61,9 +61,8 @@ test('kpi 7 giorni solo Meta', () => {
   assert.equal(k.pct.spend, -42);
 });
 
-test('nota fissa sulle schede Color', () => {
-  assert.match(card('Color Perla Village').caveat, /Lead Color gonfiati/);
-  assert.equal(card('Ciccio').caveat, null);
+test('nessuna nota fissa sulle schede Color (tolta su richiesta di Francesco)', () => {
+  assert.equal('caveat' in card('Color Perla Village'), false);
 });
 
 test('account non letto: dati fermi al giorno prima (Review Focus 1)', () => {
@@ -260,4 +259,63 @@ test('scheda di un mese futuro: "non ancora iniziato", non "nessun budget"', () 
   assert.equal(c.overall, 'notyet');
   const g = buildCards({ ...state, google: [] }, meta, '2026-11', '2026-11-14').find(x => x.tab === 'Ciccio');
   assert.equal(g.overall, 'under');   // un canale fuori ritmo resta più importante di "numeri da inserire"
+});
+
+import { trendDaily, matchQuery } from '../docs/js/viewmodel.js';
+import { trendSeries } from '../docs/js/calc.js';
+
+test('andamento: spesa e lead per giorno delle strutture scelte, giorni vuoti a zero', () => {
+  const d = trendDaily(state, meta, ['Ciccio'], '2026-11-14');
+  assert.equal(d.length, 14);
+  assert.equal(d[0].date, '2026-11-01');
+  const sum = (rows, k) => rows.reduce((a, r) => a + r[k], 0);
+  assert.equal(sum(d, 'spend'), sum(meta.daily.filter(r => r.campaign_id === 's27'), 'spend'));
+  const all = trendDaily(state, meta, state.structures.map(s => s.tab), '2026-11-14');
+  const assigned = meta.daily.filter(r => r.campaign_id !== 'x9' && r.date <= '2026-11-14');
+  assert.equal(Math.round(sum(all, 'spend')), Math.round(sum(assigned, 'spend')));   // la Flex Pay non assegnata resta fuori
+  const holes = trendDaily(state, { ...meta, daily: [{ campaign_id: 's27', date: '2026-11-01', spend: 10, leads: 1 },
+    { campaign_id: 's27', date: '2026-11-04', spend: 20, leads: 0 }] }, ['Ciccio'], '2026-11-05');
+  assert.deepEqual(holes.map(r => [r.date.slice(8), r.spend]), [['01', 10], ['02', 0], ['03', 0], ['04', 20], ['05', 0]]);
+  assert.deepEqual(trendDaily(state, { ...meta, daily: [] }, ['Ciccio'], '2026-11-05'), []);
+});
+
+test('serie per giorno: costo per lead sulla media mobile di 7 giorni', () => {
+  const daily = Array.from({ length: 10 }, (_, i) => ({ date: `2026-11-${String(i + 1).padStart(2, '0')}`, spend: 10, leads: i === 0 ? 0 : 1 }));
+  const s = trendSeries(daily, 'day');
+  assert.equal(s.length, 10);
+  assert.equal(s[0].cpl, null);
+  assert.equal(s[1].cpl, 20);          // 20 € e 1 lead nei giorni 1-2
+  assert.equal(s[7].cpl, 10);          // giorni 2-8: 70 € e 7 lead
+  assert.equal(s[7].label, '08/11');
+});
+
+test('serie per settimana: da lunedì a domenica, le settimane a metà sono segnate', () => {
+  const daily = [];
+  for (let d = 1; d <= 14; d++) daily.push({ date: `2026-11-${String(d).padStart(2, '0')}`, spend: 10, leads: 2 });
+  const w = trendSeries(daily, 'week');
+  assert.deepEqual(w.map(x => [x.from, x.to, x.spend, x.leads, x.partial]), [
+    ['2026-11-01', '2026-11-01', 10, 2, true],
+    ['2026-11-02', '2026-11-08', 70, 14, false],
+    ['2026-11-09', '2026-11-14', 60, 12, true],
+  ]);
+  assert.equal(w[1].cpl, 5);
+});
+
+test('piano mese per mese: lo speso reale accanto al programmato', () => {
+  const st = withMonth(withReq, 'Ciccio', 'meta', '2026-10', { sheet_spent: 500 });
+  const d = buildDetail(st, meta, 'Ciccio', '2026-11', '2026-11-14', 'ambra', '2026-11-15');
+  const ch = (ym, kind) => d.plan.find(p => p.ym === ym).channels.find(c => c.kind === kind);
+  assert.equal(ch('2026-11', 'meta').spent, 1140);
+  assert.equal(ch('2026-11', 'meta').spentPct, 32);
+  assert.equal(ch('2026-11', 'google').spent, 1050);
+  assert.equal(ch('2026-10', 'google').spent, 1380);
+  assert.equal(ch('2026-10', 'meta').spent, 500);      // fuori dai dati Meta: vale la Spesa Effettiva dello Sheet
+  assert.equal(ch('2026-12', 'meta').spent, null);     // mese futuro
+});
+
+test('ricerca: senza accenti e maiuscole, parole in qualsiasi ordine', () => {
+  assert.equal(matchQuery('Città del Mare', 'citta'), true);
+  assert.equal(matchQuery('Color Perla Village', 'perla col'), true);
+  assert.equal(matchQuery('Ciccio', 'perla'), false);
+  assert.equal(matchQuery('Ciccio', '  '), true);
 });

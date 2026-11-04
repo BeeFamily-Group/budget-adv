@@ -144,3 +144,29 @@ export function parseEur(v) {
   }
   return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
 }
+
+// Andamento Spesa / Lead / Costo per lead. daily: [{date, spend, leads}] giorno per giorno, senza buchi.
+// 'day': un punto al giorno, costo per lead sulla media mobile di 7 giorni (un singolo giorno con pochi lead e' rumore).
+// 'week': da lunedi' a domenica; partial = settimana coperta solo in parte dai dati.
+export function trendSeries(daily, mode = 'day') {
+  const dm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+  const cpl = (s, l) => (l > 0 ? round2(s / l) : null);
+  if (mode === 'week') {
+    const weeks = [];
+    for (const d of daily) {
+      const t = Date.parse(`${d.date}T00:00:00Z`);
+      const monday = isoDate(t - ((new Date(t).getUTCDay() + 6) % 7) * DAY_MS);
+      let w = weeks[weeks.length - 1];
+      if (!w || w.key !== monday) { w = { key: monday, from: d.date, to: d.date, spend: 0, leads: 0, days: 0 }; weeks.push(w); }
+      w.to = d.date; w.spend += d.spend; w.leads += d.leads; w.days += 1;
+    }
+    return weeks.map(w => ({ key: w.key, label: dm(w.from), from: w.from, to: w.to, spend: round2(w.spend), leads: w.leads,
+      cpl: cpl(w.spend, w.leads), partial: w.days < 7 }));
+  }
+  return daily.map((d, i) => {
+    const win = daily.slice(Math.max(0, i - 6), i + 1);
+    const s = win.reduce((a, x) => a + x.spend, 0);
+    const l = win.reduce((a, x) => a + x.leads, 0);
+    return { key: d.date, label: dm(d.date), from: d.date, to: d.date, spend: round2(d.spend), leads: d.leads, cpl: cpl(s, l), partial: false };
+  });
+}
