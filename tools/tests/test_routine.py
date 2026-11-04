@@ -192,6 +192,20 @@ class SpendTitles(unittest.TestCase):
         self.assertEqual(items, [{"channel_id": "Cirillo|A", "title": "BUDGET FACEBOOK ADS ESTERO", "ym": "2026-11", "value": 7.0}])
 
 
+class PlanTargeting(unittest.TestCase):
+    def test_targeting_only_for_accounts_with_two_meta_blocks(self):
+        accounts = {"432856047384850": "Cirillo", "421004342260012": "Ciccio"}
+        state = {"structures": [
+            {"tab": "Cirillo", "channels": [{"id": "Cirillo|A", "kind": "meta"}, {"id": "Cirillo|J", "kind": "meta"}]},
+            {"tab": "Ciccio", "channels": [{"id": "Ciccio|A", "kind": "meta"}, {"id": "Ciccio|J", "kind": "google"}]}]}
+        multi = meta_plan.multi_meta_accounts(accounts, state)
+        self.assertEqual(multi, {"432856047384850"})
+        p = meta_plan.build_plan(accounts, today=datetime.date(2026, 11, 15), targeting=multi)
+        fields = {c["key"]: c["args"]["fields"] for c in p["calls"]}
+        self.assertIn("targeting", fields["432856047384850_adsets"])
+        self.assertNotIn("targeting", fields["421004342260012_adsets"])
+
+
 class FreshRead(unittest.TestCase):
     def test_plan_without_daily(self):
         p = meta_plan.build_plan({"421004342260012": "Ciccio"}, today=datetime.date(2026, 11, 15), daily=False)

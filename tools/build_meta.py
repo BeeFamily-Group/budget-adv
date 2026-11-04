@@ -49,6 +49,18 @@ def _account_ids(raw_dir):
     return sorted(ids)
 
 
+def _countries(targeting):
+    """Paesi del target di un adset (geo_locations.countries), anche se l'MCP lo restituisce come testo JSON."""
+    if isinstance(targeting, str):
+        try:
+            targeting = json.loads(targeting)
+        except ValueError:
+            return []
+    if not isinstance(targeting, dict):
+        return []
+    return [str(c).upper() for c in ((targeting.get("geo_locations") or {}).get("countries") or [])]
+
+
 def normalize(raw_dir):
     out = {"accounts": {}, "campaigns": [], "daily": []}
     for acc in _account_ids(raw_dir):
@@ -59,9 +71,13 @@ def normalize(raw_dir):
             continue
         out["accounts"][acc] = {"ok": True, "error": None, "last_ok": None}
         adsets_by_campaign = {}
+        countries_by_campaign = {}
         for s in _load(os.path.join(raw_dir, acc + "_adsets.json")):
             adsets_by_campaign.setdefault(str(s["campaign_id"]), []).append(
                 {"id": str(s["id"]), "status": s.get("effective_status"), "daily_budget": _money(s.get("daily_budget"))})
+            geo = _countries(s.get("targeting"))
+            if geo:
+                countries_by_campaign.setdefault(str(s["campaign_id"]), set()).update(geo)
         campaigns = {}
         for c in _load(os.path.join(raw_dir, acc + "_campaigns.json")):
             cid = str(c["id"])
@@ -74,6 +90,8 @@ def normalize(raw_dir):
                 budget = round(sum(a["daily_budget"] or 0 for a in adsets if a["status"] == "ACTIVE"), 2)
             campaigns[cid] = {"id": cid, "account_id": acc, "name": c.get("name", ""), "status": c.get("effective_status"),
                               "daily_budget": budget, "budget_level": level, "adsets": adsets}
+            if cid in countries_by_campaign:
+                campaigns[cid]["countries"] = sorted(countries_by_campaign[cid])
         for r in _load(os.path.join(raw_dir, acc + "_daily.json")):
             if "id" not in r:  # Meta riempie i giorni senza spesa con righe vuote senza id
                 continue
@@ -112,7 +130,9 @@ def _channel_for(campaign, tab, meta_channels):
     letters = meta_channels.get(tab) or []
     if not letters:
         return ""
-    if len(letters) > 1 and "estero" in campaign["name"].lower():
+    countries = campaign.get("countries") or []
+    abroad = "estero" in campaign["name"].lower() or (countries and "IT" not in countries)
+    if len(letters) > 1 and abroad:
         return tab + "|" + letters[1]
     return tab + "|" + letters[0]
 

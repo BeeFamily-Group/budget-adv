@@ -27,7 +27,14 @@ def new_run_id():
     return "".join(secrets.choice(abc) for _ in range(20))
 
 
-def build_plan(accounts, today=None, daily=True):
+def multi_meta_accounts(accounts, state):
+    """Account dei tab con piu' blocchi Meta (oggi Cirillo: Italia ed Estero): per loro si legge anche il target."""
+    tabs = {s["tab"] for s in (state or {}).get("structures", [])
+            if sum(1 for ch in s["channels"] if ch["kind"] == "meta") > 1}
+    return {acc for acc, tab in accounts.items() if tab in tabs}
+
+
+def build_plan(accounts, today=None, daily=True, targeting=()):
     today = today or today_rome()
     until = today - datetime.timedelta(days=1)
     first_this = until.replace(day=1)
@@ -39,9 +46,11 @@ def build_plan(accounts, today=None, daily=True):
         calls.append({"key": acc + "_campaigns", "args": {
             "ad_account_id": acc, "level": "campaign", "limit": 500, "filtering": active,
             "fields": ["id", "name", "effective_status", "daily_budget", "lifetime_budget"]}})
+        adset_fields = ["id", "campaign_id", "effective_status", "daily_budget"]
+        if acc in targeting:
+            adset_fields.append("targeting")
         calls.append({"key": acc + "_adsets", "args": {
-            "ad_account_id": acc, "level": "adset", "limit": 500, "filtering": active,
-            "fields": ["id", "campaign_id", "effective_status", "daily_budget"]}})
+            "ad_account_id": acc, "level": "adset", "limit": 500, "filtering": active, "fields": adset_fields}})
         if not daily:
             continue
         calls.append({"key": acc + "_daily", "args": {
@@ -56,8 +65,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--roster", default=ROSTER)
     ap.add_argument("--out", default="raw/plan.json")
+    ap.add_argument("--state", help="stato della web app: serve a sapere quali account hanno due blocchi Meta")
     a = ap.parse_args()
-    plan = build_plan(accounts_mod.load_accounts(a.roster))
+    accounts = accounts_mod.load_accounts(a.roster)
+    try:
+        state = json.load(open(a.state)) if a.state else None
+    except (OSError, ValueError):
+        state = None  # senza stato si legge come sempre, solo senza target
+    plan = build_plan(accounts, targeting=multi_meta_accounts(accounts, state))
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     with open(a.out, "w") as f:
         json.dump(plan, f, indent=1)

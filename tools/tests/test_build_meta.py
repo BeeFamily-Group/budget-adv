@@ -147,6 +147,37 @@ class Normalize(unittest.TestCase):
         self.assertEqual(merged["as_of"], "2026-11-14")
 
 
+class CirilloTarget(unittest.TestCase):
+    """Spec §4: per Cirillo vanno in Estero le campagne con "estero" nel nome O con target fuori dall'Italia."""
+
+    def camp(self, cid, name, countries=None):
+        c = {"id": cid, "name": name, "account_id": "432856047384850", "status": "ACTIVE"}
+        if countries is not None:
+            c["countries"] = countries
+        return c
+
+    def test_target_outside_italy_goes_to_estero(self):
+        rows = build_meta.auto_mapping(
+            [self.camp("1", "Cirillo Primavera", ["AT", "DE"]), self.camp("2", "Cirillo Estate", ["DE", "IT"]),
+             self.camp("3", "Cirillo Ponti", [])],
+            ACCOUNTS, [], META_CHANNELS, spend_ids=set())
+        self.assertEqual({r["campaign_id"]: r["channel_id"] for r in rows},
+                         {"1": "Cirillo|J", "2": "Cirillo|A", "3": "Cirillo|A"})
+
+    def test_countries_read_from_adset_targeting(self):
+        with tempfile.TemporaryDirectory() as d:
+            write(d, "432856047384850_campaigns.json", [{"id": "c1", "name": "Primavera", "effective_status": "ACTIVE",
+                                                         "daily_budget": eur(20)}])
+            write(d, "432856047384850_adsets.json", [
+                {"id": "s1", "campaign_id": "c1", "effective_status": "ACTIVE",
+                 "targeting": {"geo_locations": {"countries": ["DE"]}}},
+                {"id": "s2", "campaign_id": "c1", "effective_status": "ACTIVE",
+                 "targeting": json.dumps({"geo_locations": {"countries": ["AT", "DE"]}})}])
+            write(d, "432856047384850_daily.json", [])
+            out = build_meta.normalize(d)
+        self.assertEqual(out["campaigns"][0]["countries"], ["AT", "DE"])
+
+
 class AccountTabs(unittest.TestCase):
     def test_each_account_names_its_structure(self):
         merged = {"accounts": {"421004342260012": {"ok": True, "error": None, "last_ok": "2026-11-14"},

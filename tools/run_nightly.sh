@@ -10,7 +10,8 @@ ROSTER="$HOME/Desktop/CLAUDE CODE/BEEFAMILY/DOWNLOAD FATTURE/_automation/roster_
 case "${1:-}" in
   plan)
     rm -rf raw && mkdir -p raw
-    $PY tools/meta_plan.py --roster "$ROSTER" --out raw/plan.json > /dev/null
+    $PY tools/routine_api.py state > raw/state_plan.json 2>/dev/null || rm -f raw/state_plan.json
+    $PY tools/meta_plan.py --roster "$ROSTER" --out raw/plan.json --state raw/state_plan.json > /dev/null
     $PY -c "import json;p=json.load(open('raw/plan.json'));print('chiamate:',len(p['calls']),'| periodo',p['since'],'→',p['until'])"
     ;;
   finish)
