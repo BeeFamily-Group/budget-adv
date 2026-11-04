@@ -177,3 +177,25 @@ test('mappa con il titolo del blocco: righe che non tornano finiscono in "da ass
   const ids = unassigned(st, meta, '2026-11', '2026-11-14').map(u => u.campaign_id).sort();
   assert.deepEqual(ids, ['b1', 's27', 'x9']);
 });
+
+test('mese in corso con "dal giorno" più avanti: la modifica parte da quel giorno, non da oggi', () => {
+  assert.equal(applyFrom({ startDay: 20 }, '2026-11', '2026-11-15'), '2026-11-20');
+  assert.equal(applyFrom({ startDay: 10 }, '2026-11', '2026-11-15'), '2026-11-15');
+});
+
+test('richiesta programmata con la data che non torna più con i giorni dello Sheet', () => {
+  const st = { ...withReq, days: [{ channel_id: 'Ciccio|A', ym: '2026-12', start_day: 10 }] };
+  const d = buildDetail(st, meta, 'Ciccio', '2026-11', '2026-11-14', 'francesco');
+  const dec = d.plan.find(p => p.ym === '2026-12').channels.find(c => c.kind === 'meta');
+  assert.match(dec.requestStatus, /su Meta dal 01\/12 · data da aggiornare: ora dal 10\/12/);
+  const ok = buildDetail(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', 'francesco')
+    .plan.find(p => p.ym === '2026-12').channels.find(c => c.kind === 'meta');
+  assert.equal(ok.requestStatus, 'su Meta dal 01/12');
+});
+
+test('richiesta scaduta: il mese è finito prima di applicarla', () => {
+  const st = { ...withReq, requests: [{ ...withReq.requests[0], ym: '2026-10', status: 'expired' }] };
+  const d = buildDetail(st, meta, 'Ciccio', '2026-11', '2026-11-14', 'francesco');
+  const oct = d.plan.find(p => p.ym === '2026-10').channels.find(c => c.kind === 'meta');
+  assert.equal(oct.requestStatus, 'scaduta: il mese è finito prima di applicarla');
+});

@@ -156,8 +156,9 @@ export function unassigned(state, meta, ym, asOf) {
 
 // Data da cui applicare su Meta una modifica: oggi per il mese in corso, primo giorno attivo per un mese futuro.
 export function applyFrom(win, ym, today) {
-  if (ym === today.slice(0, 7)) return today;
-  return `${ym}-${String(win.startDay).padStart(2, '0')}`;
+  const first = `${ym}-${String(win.startDay).padStart(2, '0')}`;
+  if (ym === today.slice(0, 7)) return first > today ? first : today;   // mese in corso: da oggi, ma mai prima del primo giorno attivo
+  return first;
 }
 
 const ddmm = (d) => (d ? `${String(d).slice(8, 10)}/${String(d).slice(5, 7)}` : '');
@@ -180,6 +181,7 @@ function requestStatus(state, channelId, ym) {
   if (r.status === 'scheduled') return `su Meta dal ${ddmm(r.apply_from)}`;
   if (r.status === 'applied') return `applicato il ${ddmm(r.updated_at || r.created_at)}`;
   if (r.status === 'error') return `errore: ${r.result}`;
+  if (r.status === 'expired') return 'scaduta: il mese è finito prima di applicarla';
   return r.status;
 }
 
@@ -217,10 +219,16 @@ export function buildDetail(state, meta, tab, ym, asOf, role) {
       const months = withOverrides(state, ch);
       const k = months.findIndex(x => x.ym === y);
       const m = months[k];
-      return { id: ch.id, kind: ch.kind, title: ch.title, eur: m.eur, days: m.days, proposal: m.proposal,
+      const row = { id: ch.id, kind: ch.kind, title: ch.title, eur: m.eur, days: m.days, proposal: m.proposal,
                programmed: (m.eur || 0) * (m.days || 0), requestStatus: ch.kind === 'meta' ? requestStatus(state, ch.id, y) : '',
                win: activeWindow(months, k), startDayCustom: Boolean(m.start_day),
                openRequest: ch.kind === 'meta' ? openRequest(state, ch.id, y) : null };
+      // richiesta programmata con una data che non torna piu' con Giorni / "dal giorno" (cambiati anche a mano nello Sheet)
+      const q = row.openRequest;
+      const due = q && q.status === 'scheduled' ? applyFrom(row.win, y, asOf.slice(0, 10)) : null;
+      row.requestStale = Boolean(due && q.apply_from !== due);
+      if (row.requestStale) row.requestStatus += ` · data da aggiornare: ora dal ${ddmm(due)}`;
+      return row;
     }),
   }));
 

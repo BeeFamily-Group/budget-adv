@@ -37,14 +37,17 @@ function daysDialog(c, ym) {
     d.innerHTML = `<form class="dialog-card" id="daysForm">
         <h3>${esc(channelLabel(c.title))} · ${monthShort(ym)}</h3>
         <p class="small">Giorni attivi: quanti giorni del mese gira il budget (il programmato è €/giorno × giorni). Dal giorno: il primo giorno attivo.</p>
+        ${c.requestStale ? '<p class="small"><b>La richiesta Meta di questo mese ha una data vecchia: Salva la ricrea con quella giusta.</b></p>' : ''}
         <label class="small">Giorni attivi <input id="dDays" type="number" min="0" max="${dim}" step="1" inputmode="numeric" value="${c.days ?? dim}"></label>
         <label class="small">Dal giorno <input id="dStart" type="number" min="1" max="${dim}" step="1" inputmode="numeric" value="${c.win.startDay}"></label>
         <p class="small" id="dErr"></p>
         <button class="btn primary" type="submit">Salva</button> <button class="btn" type="button" id="no">Annulla</button></form>`;
     d.hidden = false;
+    daysDialog.saved = false;
     const done = (v) => { d.hidden = true; d.innerHTML = ''; resolve(v); };
     d.querySelector('#no').addEventListener('click', () => done(null));
     d.querySelector('#daysForm').addEventListener('submit', (e) => {
+      daysDialog.saved = true;
       e.preventDefault();
       const days = Number(d.querySelector('#dDays').value);
       const start = Number(d.querySelector('#dStart').value);
@@ -252,15 +255,19 @@ async function onClick(e) {
       const dd = buildDetail(store.state, store.meta, currentTab, store.ym, store.asOf, store.role);
       const c = dd.plan.find(p => p.ym === b.dataset.ym).channels.find(x => x.id === b.dataset.id);
       const change = await daysDialog(c, b.dataset.ym);
-      if (change) {
-        const r = await post('savePlan', { channel_id: c.id, title: titleOf(c.id), ym: b.dataset.ym, ...change }, store.code);
-        if (!r.ok) { toast(`Non salvato: ${r.error}`); return; }
-        let msg = 'Giorni salvati nello Sheet.';
+      if (change || (change === null && c.requestStale && daysDialog.saved)) {
+        let msg = '';
+        if (change) {
+          const r = await post('savePlan', { channel_id: c.id, title: titleOf(c.id), ym: b.dataset.ym, ...change }, store.code);
+          if (!r.ok) { toast(`Non salvato: ${r.error}`); return; }
+          msg = 'Giorni salvati nello Sheet.';
+        }
         if (c.openRequest) {   // la richiesta Meta del mese riparte dal nuovo primo giorno attivo
           await reload();
           const q = await sendMetaRequest(c.id, b.dataset.ym, Number(c.openRequest.eur),
             { current: Number(c.openRequest.current_budget || 0), big: true });
           msg += q.ok ? ' Richiesta Meta aggiornata alla nuova data.' : ` Richiesta Meta non aggiornata (${q.error}).`;
+          msg = msg.trim();
         }
         await refreshAfter(msg);
       }
