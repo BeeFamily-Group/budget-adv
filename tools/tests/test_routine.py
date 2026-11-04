@@ -206,6 +206,36 @@ class PlanTargeting(unittest.TestCase):
         self.assertNotIn("targeting", fields["421004342260012_adsets"])
 
 
+class ResultFiles(unittest.TestCase):
+    """Un risultato grande l'harness lo salva in tool-results/: solo quei file si aprono, mai altri percorsi citati."""
+
+    def block(self, text):
+        return {"content": [{"type": "text", "text": text}]}
+
+    def test_only_harness_tool_results_are_opened(self):
+        with tempfile.TemporaryDirectory() as root:
+            tr = os.path.join(root, "proj", "tool-results")
+            os.makedirs(tr)
+            good = os.path.join(tr, "big.json")
+            with open(good, "w") as f:
+                f.write('{"ad_entities": "[]"}')
+            other = os.path.join(root, "segreto.txt")
+            with open(other, "w") as f:
+                f.write("non deve uscire")
+            old = harvest_meta.TOOL_RESULTS_ROOT
+            harvest_meta.TOOL_RESULTS_ROOT = root
+            try:
+                self.assertEqual(harvest_meta._result_text(self.block("Output saved to " + good)), '{"ad_entities": "[]"}')
+                self.assertNotIn("non deve uscire", harvest_meta._result_text(self.block("vedi " + other)))
+                outside = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+                outside.write('{"x": 1}')
+                outside.close()
+                self.assertNotIn('"x"', harvest_meta._result_text(self.block("vedi " + outside.name)))
+                os.unlink(outside.name)
+            finally:
+                harvest_meta.TOOL_RESULTS_ROOT = old
+
+
 class FreshRead(unittest.TestCase):
     def test_plan_without_daily(self):
         p = meta_plan.build_plan({"421004342260012": "Ciccio"}, today=datetime.date(2026, 11, 15), daily=False)

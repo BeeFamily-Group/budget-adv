@@ -14,6 +14,14 @@ import os
 import time
 
 MATCH_KEYS = ("ad_account_id", "level", "time_range", "time_increment", "fields", "filtering")
+TOOL_RESULTS_ROOT = os.path.expanduser("~/.claude")  # dove l'harness salva i risultati grandi (.../tool-results/)
+
+
+def _harness_file(path):
+    """Solo i file dei risultati salvati dall'harness: mai altri percorsi citati in un risultato (meta.json e' pubblico)."""
+    real = os.path.realpath(path)
+    root = os.path.realpath(TOOL_RESULTS_ROOT)
+    return real.startswith(root + os.sep) and (os.sep + "tool-results" + os.sep) in real and os.path.isfile(real)
 
 
 def transcripts(since_hours):
@@ -41,7 +49,7 @@ def _result_text(block):
         return c
     for tok in c.split():  # risultato grande salvato dall'harness in tool-results/
         t = tok.strip("`'\".,:;()[]")
-        if t.endswith((".txt", ".json")) and os.path.exists(t):
+        if t.endswith((".txt", ".json")) and _harness_file(t):
             return open(t, encoding="utf-8").read()
     return c
 
