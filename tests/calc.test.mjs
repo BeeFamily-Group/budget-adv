@@ -84,3 +84,25 @@ test('formato euro', () => {
   assert.equal(fmtEur(-1500), '-1.500 €');
   assert.equal(fmtEur(70), '70 €');
 });
+
+import { parseEur } from '../docs/js/calc.js';
+
+test('importi scritti all\'italiana (review I2)', () => {
+  assert.equal(parseEur('1.234'), 1234);
+  assert.equal(parseEur('1.234,56'), 1234.56);
+  assert.equal(parseEur('1.234.567'), 1234567);
+  assert.equal(parseEur('1234,5'), 1234.5);
+  assert.equal(parseEur('0,5'), 0.5);
+  assert.equal(parseEur('1234.5'), 1234.5);
+  assert.equal(parseEur('12.50'), 12.5);
+  assert.equal(parseEur(' 1 234 € '), 1234);
+  assert.equal(parseEur(120), 120);
+  assert.ok(Number.isNaN(parseEur('')));
+  assert.ok(Number.isNaN(parseEur('abc')));
+  assert.ok(Number.isNaN(parseEur('1,2,3')));
+});
+
+test('"dal giorno" che sfora il mese: i giorni attivi si fermano a fine mese (review I6)', () => {
+  const months = [{ ym: '2026-12', eur: 100, days: 31, start_day: 10 }];
+  assert.deepEqual(activeWindow(months, 0), { startDay: 10, days: 22, daysInMonth: 31 });
+});

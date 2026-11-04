@@ -149,3 +149,17 @@ test('avviso dati fermi solo per account collegati a una scheda', () => {
   const m2 = { ...meta, accounts: { ...meta.accounts, '608324351982441': { ok: false, error: 'not enabled', last_ok: null } } };
   assert.deepEqual(staleAccounts(state, m2), [{ account_id: '433491253104777', name: 'B612', last_ok: '2026-11-13' }]);
 });
+
+test('piano mese per mese: giorni attivi e "dal giorno" per ogni canale (review I6)', () => {
+  const st = { ...withReq, days: [{ channel_id: 'Ciccio|A', ym: '2026-12', start_day: 16 }] };
+  const d = buildDetail(st, meta, 'Ciccio', '2026-11', '2026-11-14', 'francesco');
+  const nov = d.plan.find(p => p.ym === '2026-11').channels.find(c => c.kind === 'meta');
+  assert.deepEqual(nov.win, { startDay: 1, days: 30, daysInMonth: 30 });
+  assert.equal(nov.startDayCustom, false);
+  const dec = d.plan.find(p => p.ym === '2026-12').channels.find(c => c.kind === 'meta');
+  assert.equal(dec.win.startDay, 16);
+  assert.equal(dec.win.days, 16);
+  assert.equal(dec.startDayCustom, true);
+  const req = d.plan.find(p => p.ym === '2026-12').channels.find(c => c.kind === 'meta').openRequest;
+  assert.equal(req.id, 'r1');
+});

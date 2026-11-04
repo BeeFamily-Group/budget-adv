@@ -153,6 +153,14 @@ export function applyFrom(win, ym, today) {
 
 const ddmm = (d) => (d ? `${String(d).slice(8, 10)}/${String(d).slice(5, 7)}` : '');
 
+// Richiesta Meta ancora da applicare (in attesa o programmata) per canale e mese, oppure null.
+function openRequest(state, channelId, ym) {
+  return state.requests
+    .filter(q => q.channel_id === channelId && q.ym === ym && (q.status === 'pending' || q.status === 'scheduled'))
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    .pop() || null;
+}
+
 function requestStatus(state, channelId, ym) {
   const r = state.requests
     .filter(q => q.channel_id === channelId && q.ym === ym && q.status !== 'superseded')
@@ -197,9 +205,13 @@ export function buildDetail(state, meta, tab, ym, asOf, role) {
   const plan = yms.map(y => ({
     ym: y,
     channels: s.channels.map(ch => {
-      const m = ch.months.find(x => x.ym === y);
+      const months = withOverrides(state, ch);
+      const k = months.findIndex(x => x.ym === y);
+      const m = months[k];
       return { id: ch.id, kind: ch.kind, title: ch.title, eur: m.eur, days: m.days, proposal: m.proposal,
-               programmed: (m.eur || 0) * (m.days || 0), requestStatus: ch.kind === 'meta' ? requestStatus(state, ch.id, y) : '' };
+               programmed: (m.eur || 0) * (m.days || 0), requestStatus: ch.kind === 'meta' ? requestStatus(state, ch.id, y) : '',
+               win: activeWindow(months, k), startDayCustom: Boolean(m.start_day),
+               openRequest: ch.kind === 'meta' ? openRequest(state, ch.id, y) : null };
     }),
   }));
 

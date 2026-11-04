@@ -27,11 +27,11 @@ export function activeWindow(months, i) {
   const days = Math.min(m.days > 0 ? m.days : dim, dim);
   let startDay = 1;
   if (m.start_day) {
-    startDay = m.start_day;
+    startDay = Math.min(m.start_day, dim);
   } else if (days < dim && !hasBudget(months[i - 1]) && hasBudget(months[i + 1])) {
     startDay = dim - days + 1;
   }
-  return { startDay, days, daysInMonth: dim };
+  return { startDay, days: Math.min(days, dim - startDay + 1), daysInMonth: dim };
 }
 
 // Giorni attivi del mese trascorsi fino ad asOf compreso.
@@ -130,3 +130,17 @@ export function fmtEur(n) {
 }
 
 export { isoDate, parseDate };
+
+// Importo scritto a mano: "1.234,56" e "1.234" all'italiana, "1234.5" con il punto decimale. NaN se non si capisce.
+export function parseEur(v) {
+  if (typeof v === 'number') return v;
+  let s = String(v ?? '').replace(/[\s€ ]/g, '');
+  if (!s) return NaN;
+  if (s.includes(',')) {
+    if ((s.match(/,/g) || []).length > 1) return NaN;
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, '');
+  }
+  return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+}

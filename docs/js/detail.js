@@ -1,6 +1,6 @@
 // Dettaglio di una struttura: canali, risultati, piano mese per mese, chiusura, note.
 import { buildDetail, channelLabel, stateLabel, channelView, applyFrom } from './viewmodel.js';
-import { fmtEur } from './calc.js';
+import { fmtEur, parseEur } from './calc.js';
 import { store, esc, ddmm, monthShort, kpiHtml, barHtml, reload } from './app.js';
 import { post } from './api.js';
 
@@ -27,6 +27,41 @@ function confirmDialog(title, body, okLabel) {
     d.querySelector('#ok').addEventListener('click', () => done(true));
     d.querySelector('#no').addEventListener('click', () => done(false));
   });
+}
+
+// Giorni attivi e "dal giorno" di un canale in un mese. Risolve {days, start_day} con i soli campi cambiati, o null.
+function daysDialog(c, ym) {
+  return new Promise((resolve) => {
+    const d = document.getElementById('dialog');
+    const dim = c.win.daysInMonth;
+    d.innerHTML = `<form class="dialog-card" id="daysForm">
+        <h3>${esc(channelLabel(c.title))} · ${monthShort(ym)}</h3>
+        <p class="small">Giorni attivi: quanti giorni del mese gira il budget (il programmato è €/giorno × giorni). Dal giorno: il primo giorno attivo.</p>
+        <label class="small">Giorni attivi <input id="dDays" type="number" min="0" max="${dim}" step="1" inputmode="numeric" value="${c.days ?? dim}"></label>
+        <label class="small">Dal giorno <input id="dStart" type="number" min="1" max="${dim}" step="1" inputmode="numeric" value="${c.win.startDay}"></label>
+        <p class="small" id="dErr"></p>
+        <button class="btn primary" type="submit">Salva</button> <button class="btn" type="button" id="no">Annulla</button></form>`;
+    d.hidden = false;
+    const done = (v) => { d.hidden = true; d.innerHTML = ''; resolve(v); };
+    d.querySelector('#no').addEventListener('click', () => done(null));
+    d.querySelector('#daysForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const days = Number(d.querySelector('#dDays').value);
+      const start = Number(d.querySelector('#dStart').value);
+      const err = d.querySelector('#dErr');
+      if (!Number.isInteger(days) || days < 0 || days > dim) { err.textContent = `Giorni attivi: da 0 a ${dim}.`; return; }
+      if (!Number.isInteger(start) || start < 1 || start > dim) { err.textContent = `Dal giorno: da 1 a ${dim}.`; return; }
+      if (days > 0 && start + days - 1 > dim) { err.textContent = `Dal ${start} restano ${dim - start + 1} giorni nel mese.`; return; }
+      const out = {};
+      if (days !== c.days) out.days = days;
+      if (start !== c.win.startDay) out.start_day = start;
+      done(Object.keys(out).length ? out : null);
+    });
+  });
+}
+
+function daysLabel(win) {
+  return `${win.days} gg${win.startDay !== 1 ? ` · dal ${win.startDay}` : ''}`;
 }
 
 function chartSvg(c) {
@@ -114,13 +149,17 @@ function planBox(d) {
       const input = editable && mine
         ? `<input class="edit${c.proposal ? ' proposal' : ''}" data-act="plan" data-id="${esc(c.id)}" data-ym="${p.ym}" data-old="${val}" value="${val}" inputmode="decimal" aria-label="${esc(channelLabel(c.title))} ${p.ym}">`
         : `<span${c.proposal ? ' title="proposta da confermare" style="background:var(--proposal);padding:0 4px;border-radius:4px"' : ''}>${val === '' ? '—' : fmtEur(val)}</span>`;
-      return `<td>${input}</td><td>${fmtEur(c.programmed)}</td>`;
+      const partial = c.win.days < c.win.daysInMonth || c.win.startDay !== 1;
+      const days = editable && mine
+        ? `<button class="days-btn" type="button" data-act="days" data-id="${esc(c.id)}" data-ym="${p.ym}" aria-label="Giorni attivi ${esc(channelLabel(c.title))} ${p.ym}">${daysLabel(c.win)}</button>`
+        : (partial ? `<span class="days-txt">${daysLabel(c.win)}</span>` : '');
+      return `<td>${input}${days}</td><td>${fmtEur(c.programmed)}</td>`;
     }).join('');
     const status = p.channels.map(c => c.requestStatus).filter(Boolean).join(' · ');
     return `<tr${p.ym === d.ym ? ' style="font-weight:600"' : ''}><td>${monthShort(p.ym)}</td>${cells}<td class="status">${esc(status)}</td></tr>`;
   }).join('');
   return `<div class="box"><h2>Piano mese per mese</h2>
-      <p class="small">In giallo le proposte da confermare. ${d.can.editMeta || d.can.editGoogle ? 'Modifica il €/giorno e premi Invio: va nello Sheet' + (d.can.editMeta ? ' e, per Meta, anche sulle campagne (mese in corso al prossimo giro orario, mesi futuri dal primo giorno attivo).' : '.') : ''}</p>
+      <p class="small">In giallo le proposte da confermare. ${d.can.editMeta || d.can.editGoogle ? 'Modifica il €/giorno e premi Invio, oppure tocca i giorni sotto: va nello Sheet' + (d.can.editMeta ? ' e, per Meta, anche sulle campagne (mese in corso al prossimo giro orario, mesi futuri dal primo giorno attivo).' : '.') : ''}</p>
       <div style="overflow-x:auto"><table class="t"><tr><th>Mese</th>${head}<th>Stato</th></tr>${body}</table></div></div>`;
 }
 
@@ -172,18 +211,22 @@ function channelOf(id) {
   return store.state.structures.find(s => s.tab === currentTab).channels.find(c => c.id === id);
 }
 
-async function sendMetaRequest(id, ym, eur) {
-  const ch = channelOf(id);
-  const now = channelView(store.state, store.meta, ch, store.asOf.slice(0, 7), store.asOf);
-  const target = channelView(store.state, store.meta, ch, ym, store.asOf);
+// Variazione Meta oltre il 50%: la seconda conferma arriva PRIMA di qualsiasi scrittura. null = annullato.
+async function metaCheck(id, eur) {
+  const now = channelView(store.state, store.meta, channelOf(id), store.asOf.slice(0, 7), store.asOf);
   const current = now ? now.dailyBudget : 0;
   const big = current > 0 && Math.abs(eur / current - 1) > 0.5;
   if (big) {
     const ok = await confirmDialog('Variazione grande su Meta',
       `Il budget su Meta passa da <b>${fmtEur(current)}/g</b> a <b>${fmtEur(eur)}/g</b> (${eur > current ? '+' : ''}${Math.round((eur / current - 1) * 100)}%). Confermi?`, 'Confermo');
-    if (!ok) return { ok: false, error: 'annullato' };
+    if (!ok) return null;
   }
-  return post('metaRequest', { channel_id: id, ym, eur, current_budget: current, confirm_big: big,
+  return { current, big };
+}
+
+function sendMetaRequest(id, ym, eur, check) {
+  const target = channelView(store.state, store.meta, channelOf(id), ym, store.asOf);
+  return post('metaRequest', { channel_id: id, ym, eur, current_budget: check.current, confirm_big: check.big,
     apply_from: applyFrom(target.win, ym, todayRome()) }, store.code);
 }
 
@@ -194,9 +237,30 @@ async function onClick(e) {
   b.disabled = true;
   try {
     if (b.dataset.act === 'toMeta') {
-      const r = await sendMetaRequest(b.dataset.id, store.ym, Number(b.dataset.eur));
-      if (r.ok) await refreshAfter('Richiesta inviata: Meta si aggiorna al prossimo giro orario.');
-      else if (r.error !== 'annullato') toast(`Non salvato: ${r.error}`);
+      const eur = Number(b.dataset.eur);
+      const check = await metaCheck(b.dataset.id, eur);
+      if (check) {
+        const r = await sendMetaRequest(b.dataset.id, store.ym, eur, check);
+        if (r.ok) await refreshAfter('Richiesta inviata: Meta si aggiorna al prossimo giro orario.');
+        else toast(`Non salvato: ${r.error}`);
+      }
+    }
+    if (b.dataset.act === 'days') {
+      const dd = buildDetail(store.state, store.meta, currentTab, store.ym, store.asOf, store.role);
+      const c = dd.plan.find(p => p.ym === b.dataset.ym).channels.find(x => x.id === b.dataset.id);
+      const change = await daysDialog(c, b.dataset.ym);
+      if (change) {
+        const r = await post('savePlan', { channel_id: c.id, ym: b.dataset.ym, ...change }, store.code);
+        if (!r.ok) { toast(`Non salvato: ${r.error}`); return; }
+        let msg = 'Giorni salvati nello Sheet.';
+        if (c.openRequest) {   // la richiesta Meta del mese riparte dal nuovo primo giorno attivo
+          await reload();
+          const q = await sendMetaRequest(c.id, b.dataset.ym, Number(c.openRequest.eur),
+            { current: Number(c.openRequest.current_budget || 0), big: true });
+          msg += q.ok ? ' Richiesta Meta aggiornata alla nuova data.' : ` Richiesta Meta non aggiornata (${q.error}).`;
+        }
+        await refreshAfter(msg);
+      }
     }
     if (b.dataset.act === 'lowerPlan') {
       const r = await post('savePlan', { channel_id: b.dataset.id, ym: store.ym, eur: Number(b.dataset.eur) }, store.code);
@@ -209,14 +273,17 @@ async function onKey(e) {
   const i = e.target;
   if (e.key !== 'Enter' || i.dataset.act !== 'plan') return;
   e.preventDefault();
-  const eur = Number(String(i.value).replace(',', '.'));
-  if (!(eur >= 0) || String(i.value).trim() === '' || String(eur) === i.dataset.old) return;
-  i.disabled = true;
+  const eur = parseEur(i.value);
+  if (!(eur >= 0)) { toast('Importo non valido: scrivi per esempio 120 oppure 1.200'); return; }
+  if (String(eur) === i.dataset.old) return;
   const ch = channelOf(i.dataset.id);
+  const check = ch.kind === 'meta' ? await metaCheck(i.dataset.id, eur) : null;
+  if (ch.kind === 'meta' && !check) { i.value = i.dataset.old; return; }   // annullato: nulla è stato scritto
+  i.disabled = true;
   const r = await post('savePlan', { channel_id: i.dataset.id, ym: i.dataset.ym, eur }, store.code);
   if (!r.ok) { toast(`Non salvato: ${r.error}`); i.disabled = false; return; }
   if (ch.kind === 'meta') {
-    const q = await sendMetaRequest(i.dataset.id, i.dataset.ym, eur);
+    const q = await sendMetaRequest(i.dataset.id, i.dataset.ym, eur, check);
     await refreshAfter(q.ok ? 'Piano salvato e richiesta Meta creata.' : `Piano salvato; richiesta Meta non creata (${q.error}).`);
   } else {
     await refreshAfter('Piano salvato nello Sheet.');
@@ -237,7 +304,7 @@ async function onSubmit(e) {
     if (r.ok) await refreshAfter('Nota salvata.');
   }
   if (f.dataset.act === 'google') {
-    const num = (v) => Number(String(v || '0').replace(',', '.'));
+    const num = (v) => (String(v ?? '').trim() === '' ? 0 : parseEur(v));
     r = await post('saveGoogle', { channel_id: f.dataset.id, date: todayRome().slice(0, 7) === store.ym ? todayRome() : `${store.ym}-28`,
       spent_mtd: num(data.spent_mtd), leads_mtd: num(data.leads_mtd), daily_budget: num(data.daily_budget), active: data.active === '1' }, store.code);
     if (r.ok) await refreshAfter(r.sheet === 'aggiornato' ? 'Numeri Google salvati anche nello Sheet.' : 'Numeri Google salvati (nello Sheet c\'era un valore a mano, non toccato).');

@@ -146,8 +146,9 @@ function writeSpendCell(who, action, channel_id, ym, value) {
   var a1 = loc.sheet.getName() + '!' + range.getA1Notation();
   var before = range.getValue();
   if (!spendWritable(before, lastSystemWrite(a1))) return { ok: true, skipped: 'valore inserito a mano' };
-  range.setValue(Math.round(Number(value) * 100) / 100);
-  log(who, action, a1, before, value);
+  var rounded = Math.round(Number(value) * 100) / 100;
+  range.setValue(rounded);
+  log(who, action, a1, before, rounded);
   return { ok: true };
 }
 
@@ -165,7 +166,7 @@ var USER_ACTIONS = {
 
   saveNote: function (role, b) {
     if (!canWriteNote(role, role)) return { ok: false, error: 'forbidden' };
-    SpreadsheetApp.getActive().getSheetByName('NOTE').appendRow([nowIso(), b.tab, "'" + b.ym, role, String(b.text || '').slice(0, 2000)]);
+    SpreadsheetApp.getActive().getSheetByName('NOTE').appendRow([nowIso(), b.tab, "'" + b.ym, role, "'" + String(b.text || '').slice(0, 2000)]);
     return { ok: true };
   },
 
@@ -174,15 +175,16 @@ var USER_ACTIONS = {
     if (!canEditChannel(role, loc.block.kind)) return { ok: false, error: 'forbidden' };
     var cell = planCell(loc.values, loc.block.col, b.ym);
     var eurRange = loc.sheet.getRange(cell.row, cell.colEur);
-    var a1 = loc.sheet.getName() + '!' + eurRange.getA1Notation();
-    log(role, 'savePlan', a1, eurRange.getValue(), b.eur);
-    eurRange.setValue(Number(b.eur)).setBackground(null);
-    if (b.days !== undefined && b.days !== null) {
+    if (b.eur !== undefined && b.eur !== null && b.eur !== '') {
+      log(role, 'savePlan', loc.sheet.getName() + '!' + eurRange.getA1Notation(), eurRange.getValue(), Number(b.eur));
+      eurRange.setValue(Number(b.eur)).setBackground(null);
+    }
+    if (b.days !== undefined && b.days !== null && b.days !== '') {
       var dRange = loc.sheet.getRange(cell.row, cell.colDays);
       log(role, 'savePlan', loc.sheet.getName() + '!' + dRange.getA1Notation(), dRange.getValue(), b.days);
       dRange.setValue(Number(b.days));
     }
-    if (b.start_day !== undefined && b.start_day !== null) {
+    if (b.start_day !== undefined && b.start_day !== null && b.start_day !== '') {
       var giorni = rows('GIORNI').filter(function (r) { return r.channel_id === b.channel_id && r.ym === b.ym; })[0];
       if (giorni) updateRow('GIORNI', giorni._row, { start_day: b.start_day });
       else SpreadsheetApp.getActive().getSheetByName('GIORNI').appendRow([b.channel_id, "'" + b.ym, b.start_day]);
@@ -226,14 +228,19 @@ var ROUTINE_ACTIONS = {
   requestResult: function (b) {
     var row = rows('RICHIESTE META').filter(function (r) { return r.id === b.id; })[0];
     if (!row) return { ok: false, error: 'richiesta sconosciuta' };
-    updateRow('RICHIESTE META', row._row, { status: b.status, result: b.result, updated_at: nowIso() });
+    updateRow('RICHIESTE META', row._row, { status: b.status, result: "'" + String(b.result || '').slice(0, 1000), updated_at: nowIso() });
     return { ok: true };
   },
-  writeSpend: function (b) { return writeSpendCell('routine', 'writeSpend', b.channel_id, b.ym, b.value); },
+  writeSpend: function (b) {
+    var bad = validatePayload('writeSpend', b);
+    return bad ? { ok: false, error: bad } : writeSpendCell('routine', 'writeSpend', b.channel_id, b.ym, b.value);
+  },
   writeSpendBatch: function (b) {
     var out = { ok: true, written: 0, skipped: [], errors: [] };
     (b.items || []).forEach(function (it) {
       try {
+        var bad = validatePayload('writeSpend', it);
+        if (bad) throw new Error(bad);
         var r = writeSpendCell('routine', 'writeSpend', it.channel_id, it.ym, it.value);
         if (r.skipped) out.skipped.push(it.channel_id + ' ' + it.ym); else out.written++;
       } catch (err) {
@@ -249,7 +256,7 @@ var ROUTINE_ACTIONS = {
     var added = 0;
     (b.rows || []).forEach(function (r) {
       if (known[String(r.campaign_id)]) return;
-      sh.appendRow(["'" + r.account_id, "'" + r.campaign_id, r.campaign_name, r.channel_id || '']);
+      sh.appendRow(["'" + r.account_id, "'" + r.campaign_id, "'" + String(r.campaign_name || ''), r.channel_id || '']);
       known[String(r.campaign_id)] = true;
       added++;
     });
@@ -282,6 +289,8 @@ function doPost(e) {
     var role = roleFromCode(body.code, userHashes, sha256);
     if (!role) return json({ ok: false, error: 'codice non valido' });
     var ua = USER_ACTIONS[body.action];
+    var bad = validatePayload(body.action, body);
+    if (bad) return json({ ok: false, error: bad });
     if (body.action !== 'whoami') dropCache();
     return json(ua ? ua(role, body) : { ok: false, error: 'azione sconosciuta' });
   } catch (err) {

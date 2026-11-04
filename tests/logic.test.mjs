@@ -101,3 +101,24 @@ test('richieste da applicare', () => {
   ];
   assert.deepEqual(L.dueRequests(reqs, '2026-11-15').map(r => r.id), ['a', 'c']);
 });
+
+test('valori controllati dal server prima di scrivere (review I2)', () => {
+  const v = L.validatePayload;
+  assert.equal(v('savePlan', { ym: '2026-11', eur: 120 }), '');
+  assert.equal(v('savePlan', { ym: '2026-11', days: 16, start_day: 16 }), '');
+  assert.match(v('savePlan', { ym: '2026-11' }), /niente da salvare/);
+  assert.match(v('savePlan', { ym: '2026-11', eur: -5 }), /€\/giorno/);
+  assert.match(v('savePlan', { ym: '2026-11', eur: 'NaN' }), /€\/giorno/);
+  assert.match(v('savePlan', { ym: '2026-11', days: 32 }), /giorni/);
+  assert.match(v('savePlan', { ym: '2026-11', start_day: 0 }), /dal giorno/);
+  assert.match(v('savePlan', { ym: '11/2026', eur: 10 }), /mese/);
+  assert.equal(v('saveGoogle', { date: '2026-11-04', spent_mtd: 1234, leads_mtd: 12, daily_budget: 80 }), '');
+  assert.match(v('saveGoogle', { date: '2026-11-04', spent_mtd: NaN, leads_mtd: 0, daily_budget: 0 }), /speso/);
+  assert.match(v('saveGoogle', { date: '2026-11-04', spent_mtd: 10, leads_mtd: 1.5, daily_budget: 0 }), /lead/);
+  assert.equal(v('metaRequest', { ym: '2026-12', eur: 130, apply_from: '2026-12-01' }), '');
+  assert.match(v('metaRequest', { ym: '2026-12', eur: 0, apply_from: '2026-12-01' }), /Gestione inserzioni/);
+  assert.match(v('metaRequest', { ym: '2026-12', eur: 130 }), /data/);
+  assert.equal(v('writeSpend', { ym: '2026-11', value: 286.59 }), '');
+  assert.match(v('writeSpend', { ym: '2026-11', value: -1 }), /speso/);
+  assert.equal(v('saveNote', { ym: '2026-11', text: 'x' }), '');
+});

@@ -155,11 +155,45 @@ function dueRequests(requests, today) {
   });
 }
 
+// Controllo dei valori prima di scrivere nello Sheet: '' se va bene, altrimenti il motivo.
+var YM_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+var DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+function given(v) { return v !== undefined && v !== null && v !== ''; }
+function isAmount(v) { return given(v) && isFinite(Number(v)) && Number(v) >= 0; }
+function isIntIn(v, lo, hi) { var n = Number(v); return given(v) && Math.floor(n) === n && n >= lo && n <= hi; }
+
+function validatePayload(action, b) {
+  b = b || {};
+  if (action === 'savePlan') {
+    if (!YM_RE.test(String(b.ym))) return 'mese non valido';
+    if (!given(b.eur) && !given(b.days) && !given(b.start_day)) return 'niente da salvare';
+    if (given(b.eur) && !isAmount(b.eur)) return '€/giorno non valido';
+    if (given(b.days) && !isIntIn(b.days, 0, 31)) return 'giorni non validi (da 0 a 31)';
+    if (given(b.start_day) && !isIntIn(b.start_day, 1, 31)) return 'dal giorno non valido (da 1 a 31)';
+  }
+  if (action === 'saveGoogle') {
+    if (!DATE_RE.test(String(b.date))) return 'data non valida';
+    if (!isAmount(b.spent_mtd)) return 'speso del mese non valido';
+    if (!isIntIn(b.leads_mtd, 0, 1e6)) return 'lead non validi';
+    if (!isAmount(b.daily_budget)) return '€/giorno non valido';
+  }
+  if (action === 'metaRequest') {
+    if (!YM_RE.test(String(b.ym))) return 'mese non valido';
+    if (!isAmount(b.eur) || Number(b.eur) <= 0) return 'per spegnere le campagne usa Gestione inserzioni: qui il €/giorno deve essere maggiore di 0';
+    if (!DATE_RE.test(String(b.apply_from))) return 'data di partenza mancante';
+  }
+  if (action === 'writeSpend') {
+    if (!YM_RE.test(String(b.ym))) return 'mese non valido';
+    if (!isAmount(b.value)) return 'speso non valido';
+  }
+  return '';
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     LAYOUT: LAYOUT, monthsList: monthsList, monthLabel: monthLabel, colLetter: colLetter,
     findBlocks: findBlocks, readMonths: readMonths, channelId: channelId, planCell: planCell,
     roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote,
-    spendWritable: spendWritable, newMetaRequest: newMetaRequest, dueRequests: dueRequests, ymOf: ymOf, fitsCache: fitsCache,
+    spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, dueRequests: dueRequests, ymOf: ymOf, fitsCache: fitsCache,
   };
 }
