@@ -7,6 +7,8 @@ import argparse
 import json
 import math
 
+from spend import row_matches
+
 
 def split(current, total):
     total = int(round(total))
@@ -37,10 +39,10 @@ def _entities(campaigns, ids):
     return ents
 
 
-def plan_changes(request, campaigns, mapping):
+def plan_changes(request, campaigns, mapping, channel_title=None):
     if request.get("status") not in ("pending", "scheduled"):
         return []
-    ids = {str(r["campaign_id"]) for r in mapping if r.get("channel_id") == request["channel_id"]}
+    ids = {str(r["campaign_id"]) for r in mapping if row_matches(r, request["channel_id"], channel_title)}
     ents = _entities(campaigns, ids)
     new = split([e[2] for e in ents], request["eur"])
     return [{"entity_type": t, "entity_id": i, "old": _num(old), "new": n, "was_active": True}
@@ -82,7 +84,9 @@ def main():
     if args.cmd == "plan":
         meta = json.load(open(args.meta))
         state = json.load(open(args.state))
-        print(json.dumps(plan_changes(json.loads(args.request), meta["campaigns"], state["mapping"])))
+        req = json.loads(args.request)
+        titles = {ch["id"]: ch["title"] for s in state["structures"] for ch in s["channels"]}
+        print(json.dumps(plan_changes(req, meta["campaigns"], state["mapping"], titles.get(req["channel_id"]))))
     else:
         print(json.dumps(after_update(json.loads(args.changes), json.loads(args.readback)), ensure_ascii=False))
 

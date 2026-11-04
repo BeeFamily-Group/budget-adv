@@ -25,12 +25,19 @@ export const COLOR_CAVEAT ='Lead Color gonfiati: arrivano a coppie (doppio invio
 const RANK = { over: 3, under: 2, ok: 1, none: 0 };
 const round2 = (n) => Math.round(n * 100) / 100;
 
-function mappedIds(mapping, channelId) {
-  return new Set(mapping.filter(r => r.channel_id === channelId).map(r => String(r.campaign_id)));
+// Una riga MAPPA vale per il canale se ha il suo id e, quando c'è, lo stesso titolo del blocco (righe vecchie senza titolo: valgono).
+function rowMatches(r, ch) {
+  const id = typeof ch === 'string' ? ch : ch.id;
+  const title = typeof ch === 'string' ? null : ch.title;
+  return r.channel_id === id && (!r.channel_title || !title || r.channel_title === title);
 }
 
-export function metaSpent(meta, mapping, channelId, ym, asOf) {
-  const ids = mappedIds(mapping, channelId);
+function mappedIds(mapping, ch) {
+  return new Set(mapping.filter(r => rowMatches(r, ch)).map(r => String(r.campaign_id)));
+}
+
+export function metaSpent(meta, mapping, ch, ym, asOf) {
+  const ids = mappedIds(mapping, ch);
   const byDate = new Map();
   for (const r of meta.daily) {
     if (!ids.has(String(r.campaign_id)) || !r.date.startsWith(ym) || r.date > asOf) continue;
@@ -56,8 +63,8 @@ function latestGoogle(google, channelId, ym) {
     .pop() || null;
 }
 
-function staleSince(meta, mapping, channelId) {
-  const ids = mappedIds(mapping, channelId);
+function staleSince(meta, mapping, ch) {
+  const ids = mappedIds(mapping, ch);
   const accs = new Set(meta.campaigns.filter(c => ids.has(String(c.id))).map(c => c.account_id));
   const dates = [...accs].map(a => meta.accounts[a]).filter(a => a && !a.ok).map(a => a.last_ok || '');
   return dates.length ? dates.sort()[0] : null;
@@ -81,10 +88,10 @@ export function channelView(state, meta, ch, ym, asOf) {
   let spentAsOf = asOf;
   let extra;
   if (ch.kind === 'meta') {
-    const s = metaSpent(meta, state.mapping, ch.id, ym, asOf);
+    const s = metaSpent(meta, state.mapping, ch, ym, asOf);
     spent = s.spent;
     extra = { dailyBudget: s.dailyBudget, activeCampaigns: s.activeCampaigns, daily: s.daily,
-              updatedOn: null, stale: false, dataStaleSince: staleSince(meta, state.mapping, ch.id) };
+              updatedOn: null, stale: false, dataStaleSince: staleSince(meta, state.mapping, ch) };
   } else {
     const g = latestGoogle(state.google, ch.id, ym);
     spent = g ? Number(g.spent_mtd) : 0;
@@ -110,7 +117,7 @@ export function buildCards(state, meta, ym, asOf) {
     // I 7 giorni guardano anche a fine mese precedente: si usa il giornaliero completo, non solo il mese scelto.
     const allDaily = new Map();
     for (const ch of s.channels.filter(c => c.kind === 'meta')) {
-      const ids = mappedIds(state.mapping, ch.id);
+      const ids = mappedIds(state.mapping, ch);
       for (const r of meta.daily) {
         if (!ids.has(String(r.campaign_id)) || r.date > asOf) continue;
         const cur = allDaily.get(r.date) || { date: r.date, spend: 0, leads: 0 };
@@ -133,7 +140,9 @@ export function buildCards(state, meta, ym, asOf) {
 }
 
 export function unassigned(state, meta, ym, asOf) {
-  const assigned = new Set(state.mapping.filter(r => r.channel_id).map(r => String(r.campaign_id)));
+  // assegnata = la sua riga MAPPA punta a un blocco che esiste ancora con lo stesso titolo (tab rinominato o colonne spostate: no)
+  const channels = state.structures.flatMap(s => s.channels);
+  const assigned = new Set(state.mapping.filter(r => channels.some(ch => rowMatches(r, ch))).map(r => String(r.campaign_id)));
   const spent = new Map();
   for (const r of meta.daily) {
     if (assigned.has(String(r.campaign_id)) || !r.date.startsWith(ym) || r.date > asOf || !(r.spend > 0)) continue;

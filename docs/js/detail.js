@@ -211,6 +211,9 @@ function channelOf(id) {
   return store.state.structures.find(s => s.tab === currentTab).channels.find(c => c.id === id);
 }
 
+// Ogni scrittura porta il titolo del blocco: se nello Sheet le colonne si sono spostate, la web app rifiuta.
+const titleOf = (id) => channelOf(id).title;
+
 // Variazione Meta oltre il 50%: la seconda conferma arriva PRIMA di qualsiasi scrittura. null = annullato.
 async function metaCheck(id, eur) {
   const now = channelView(store.state, store.meta, channelOf(id), store.asOf.slice(0, 7), store.asOf);
@@ -226,7 +229,7 @@ async function metaCheck(id, eur) {
 
 function sendMetaRequest(id, ym, eur, check) {
   const target = channelView(store.state, store.meta, channelOf(id), ym, store.asOf);
-  return post('metaRequest', { channel_id: id, ym, eur, current_budget: check.current, confirm_big: check.big,
+  return post('metaRequest', { channel_id: id, title: titleOf(id), ym, eur, current_budget: check.current, confirm_big: check.big,
     apply_from: applyFrom(target.win, ym, todayRome()) }, store.code);
 }
 
@@ -250,7 +253,7 @@ async function onClick(e) {
       const c = dd.plan.find(p => p.ym === b.dataset.ym).channels.find(x => x.id === b.dataset.id);
       const change = await daysDialog(c, b.dataset.ym);
       if (change) {
-        const r = await post('savePlan', { channel_id: c.id, ym: b.dataset.ym, ...change }, store.code);
+        const r = await post('savePlan', { channel_id: c.id, title: titleOf(c.id), ym: b.dataset.ym, ...change }, store.code);
         if (!r.ok) { toast(`Non salvato: ${r.error}`); return; }
         let msg = 'Giorni salvati nello Sheet.';
         if (c.openRequest) {   // la richiesta Meta del mese riparte dal nuovo primo giorno attivo
@@ -263,7 +266,7 @@ async function onClick(e) {
       }
     }
     if (b.dataset.act === 'lowerPlan') {
-      const r = await post('savePlan', { channel_id: b.dataset.id, ym: store.ym, eur: Number(b.dataset.eur) }, store.code);
+      const r = await post('savePlan', { channel_id: b.dataset.id, title: titleOf(b.dataset.id), ym: store.ym, eur: Number(b.dataset.eur) }, store.code);
       if (r.ok) await refreshAfter('Piano aggiornato nello Sheet.'); else toast(`Non salvato: ${r.error}`);
     }
   } finally { b.disabled = false; }
@@ -280,7 +283,7 @@ async function onKey(e) {
   const check = ch.kind === 'meta' ? await metaCheck(i.dataset.id, eur) : null;
   if (ch.kind === 'meta' && !check) { i.value = i.dataset.old; return; }   // annullato: nulla è stato scritto
   i.disabled = true;
-  const r = await post('savePlan', { channel_id: i.dataset.id, ym: i.dataset.ym, eur }, store.code);
+  const r = await post('savePlan', { channel_id: i.dataset.id, title: titleOf(i.dataset.id), ym: i.dataset.ym, eur }, store.code);
   if (!r.ok) { toast(`Non salvato: ${r.error}`); i.disabled = false; return; }
   if (ch.kind === 'meta') {
     const q = await sendMetaRequest(i.dataset.id, i.dataset.ym, eur, check);
@@ -305,7 +308,7 @@ async function onSubmit(e) {
   }
   if (f.dataset.act === 'google') {
     const num = (v) => (String(v ?? '').trim() === '' ? 0 : parseEur(v));
-    r = await post('saveGoogle', { channel_id: f.dataset.id, date: todayRome().slice(0, 7) === store.ym ? todayRome() : `${store.ym}-28`,
+    r = await post('saveGoogle', { channel_id: f.dataset.id, title: titleOf(f.dataset.id), date: todayRome().slice(0, 7) === store.ym ? todayRome() : `${store.ym}-28`,
       spent_mtd: num(data.spent_mtd), leads_mtd: num(data.leads_mtd), daily_budget: num(data.daily_budget), active: data.active === '1' }, store.code);
     if (r.ok) await refreshAfter(r.sheet === 'aggiornato' ? 'Numeri Google salvati anche nello Sheet.' : 'Numeri Google salvati (nello Sheet c\'era un valore a mano, non toccato).');
   }

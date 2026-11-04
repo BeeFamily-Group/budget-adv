@@ -63,6 +63,28 @@ class AutoMapping(unittest.TestCase):
         self.assertEqual(rows[0]["channel_id"], "")
 
 
+class MappingTitles(unittest.TestCase):
+    """Review I1: ogni riga MAPPA porta il titolo del blocco; le righe vecchie senza titolo lo ricevono."""
+    TITLES = {"Ciccio|A": "BUDGET FACEBOOK ADS", "Cirillo|A": "BUDGET FACEBOOK ADS ITALIA",
+              "Cirillo|J": "BUDGET FACEBOOK ADS ESTERO"}
+
+    def test_new_rows_carry_the_title(self):
+        rows = build_meta.auto_mapping(
+            [{"id": "9", "name": "Cirillo Estero Primavera", "account_id": "432856047384850", "status": "ACTIVE"}],
+            ACCOUNTS, [], META_CHANNELS, spend_ids=set(), titles=self.TITLES)
+        self.assertEqual(rows[0]["channel_title"], "BUDGET FACEBOOK ADS ESTERO")
+
+    def test_backfill_only_rows_without_title(self):
+        existing = [{"account_id": "421004342260012", "campaign_id": "s27", "campaign_name": "SUMMER", "channel_id": "Ciccio|A",
+                     "channel_title": ""},
+                    {"account_id": "432856047384850", "campaign_id": "9", "campaign_name": "E", "channel_id": "Cirillo|J",
+                     "channel_title": "BUDGET FACEBOOK ADS ESTERO"},
+                    {"account_id": "1576344015714351", "campaign_id": "x9", "campaign_name": "Flex", "channel_id": ""}]
+        rows = build_meta.title_backfill(existing, self.TITLES)
+        self.assertEqual(rows, [{"account_id": "421004342260012", "campaign_id": "s27", "campaign_name": "SUMMER",
+                                 "channel_id": "Ciccio|A", "channel_title": "BUDGET FACEBOOK ADS"}])
+
+
 class Normalize(unittest.TestCase):
     def test_adset_budget_level_and_daily(self):
         with tempfile.TemporaryDirectory() as d:

@@ -163,3 +163,17 @@ test('piano mese per mese: giorni attivi e "dal giorno" per ogni canale (review 
   const req = d.plan.find(p => p.ym === '2026-12').channels.find(c => c.kind === 'meta').openRequest;
   assert.equal(req.id, 'r1');
 });
+
+test('mappa con il titolo del blocco: righe che non tornano finiscono in "da assegnare" (review I1)', () => {
+  const st = { ...state, mapping: [
+    { account_id: '421004342260012', campaign_id: 's27', campaign_name: 'SUMMER_2027', channel_id: 'Ciccio|A', channel_title: 'BUDGET FACEBOOK ADS ESTERO' },
+    { account_id: '433491253104777', campaign_id: 'b1', campaign_name: 'Mercatini', channel_id: 'B612 vecchio|A', channel_title: 'BUDGET FACEBOOK ADS' },
+    { account_id: '1576344015714351', campaign_id: 'p1', campaign_name: 'Perla Village - Estate 2027', channel_id: 'Color Perla Village|A', channel_title: 'BUDGET FACEBOOK ADS' },
+  ] };
+  const ciccio = st.structures.find(s => s.tab === 'Ciccio').channels[0];
+  assert.equal(metaSpent(meta, st.mapping, ciccio, '2026-11', '2026-11-14').spent, 0);
+  const perla = st.structures.find(s => s.tab === 'Color Perla Village').channels[0];
+  assert.equal(metaSpent(meta, st.mapping, perla, '2026-11', '2026-11-14').spent, 700);
+  const ids = unassigned(st, meta, '2026-11', '2026-11-14').map(u => u.campaign_id).sort();
+  assert.deepEqual(ids, ['b1', 's27', 'x9']);
+});

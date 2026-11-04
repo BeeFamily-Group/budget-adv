@@ -122,3 +122,11 @@ test('valori controllati dal server prima di scrivere (review I2)', () => {
   assert.match(v('writeSpend', { ym: '2026-11', value: -1 }), /speso/);
   assert.equal(v('saveNote', { ym: '2026-11', text: 'x' }), '');
 });
+
+test('il blocco si riconosce anche dal titolo: colonne spostate = nessuna scrittura (review I1)', () => {
+  const block = { letter: 'J', title: 'ESTERO GOOGLE ADS' };
+  assert.equal(L.titleMismatch(block, 'ESTERO GOOGLE ADS', 'Cristallo'), '');
+  assert.equal(L.titleMismatch(block, ' estero  google ads ', 'Cristallo'), '');
+  assert.match(L.titleMismatch(block, 'BUDGET GOOGLE ADS', 'Cristallo'), /Cristallo.*J.*ESTERO GOOGLE ADS.*Ricarica/);
+  assert.match(L.titleMismatch(block, undefined, 'Cristallo'), /ricaricare/);
+});

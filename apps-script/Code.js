@@ -5,7 +5,7 @@ var SERVICE_TABS = {
   NOTE: ['ts', 'tab', 'ym', 'author', 'text'],
   GOOGLE: ['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author'],
   'RICHIESTE META': ['id', 'channel_id', 'ym', 'eur', 'current_budget', 'apply_from', 'created_by', 'created_at', 'status', 'result', 'updated_at'],
-  MAPPA: ['account_id', 'campaign_id', 'campaign_name', 'channel_id'],
+  MAPPA: ['account_id', 'campaign_id', 'campaign_name', 'channel_id', 'channel_title'],
   GIORNI: ['channel_id', 'ym', 'start_day'],
   LOG: ['ts', 'who', 'action', 'cell', 'before', 'after'],
 };
@@ -40,6 +40,16 @@ function setup() {
   });
 }
 
+// Intestazione aggiornata quando un tab di servizio guadagna una colonna (MAPPA: channel_title).
+function ensureHeader(name) {
+  var sh = SpreadsheetApp.getActive().getSheetByName(name);
+  var head = SERVICE_TABS[name];
+  if (sh.getRange(1, head.length).getValue() !== head[head.length - 1]) {
+    sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold');
+  }
+  return sh;
+}
+
 function clientSheets() {
   return SpreadsheetApp.getActive().getSheets().filter(function (sh) { return !SERVICE_TABS[sh.getName()]; });
 }
@@ -70,6 +80,7 @@ function sheetGrid(sh) {
 }
 
 function buildState() {
+  var skipped = [];
   var structures = clientSheets().map(function (sh) {
     var g = sheetGrid(sh);
     return {
@@ -78,11 +89,15 @@ function buildState() {
         return { id: channelId(sh.getName(), b.letter), kind: b.kind, title: b.title, months: readMonths(g.values, g.bg, b.col) };
       }),
     };
-  }).filter(function (s) { return s.channels.length > 0; });
+  }).filter(function (s) {
+    if (!s.channels.length) skipped.push(s.tab);   // tab cliente senza blocchi riconosciuti: riga dei titoli spostata?
+    return s.channels.length > 0;
+  });
   return {
     ok: true,
     generated_at: nowIso(),
     structures: structures,
+    skipped_tabs: skipped,
     notes: strip(rows('NOTE')),
     google: strip(rows('GOOGLE')),
     requests: strip(rows('RICHIESTE META')),
@@ -139,8 +154,16 @@ function locateChannel(channel_id) {
   return { sheet: sh, values: g.values, block: block };
 }
 
-function writeSpendCell(who, action, channel_id, ym, value) {
+// Come locateChannel, ma solo se il blocco ha ancora il titolo che ha visto chi scrive (colonne spostate = nessuna scrittura).
+function locateChecked(channel_id, title) {
   var loc = locateChannel(channel_id);
+  var bad = titleMismatch(loc.block, title, loc.sheet.getName());
+  if (bad) throw new Error(bad);
+  return loc;
+}
+
+function writeSpendCell(who, action, channel_id, title, ym, value) {
+  var loc = locateChecked(channel_id, title);
   var cell = planCell(loc.values, loc.block.col, ym);
   var range = loc.sheet.getRange(cell.row, cell.colSpend);
   var a1 = loc.sheet.getName() + '!' + range.getA1Notation();
@@ -171,7 +194,7 @@ var USER_ACTIONS = {
   },
 
   savePlan: function (role, b) {
-    var loc = locateChannel(b.channel_id);
+    var loc = locateChecked(b.channel_id, b.title);
     if (!canEditChannel(role, loc.block.kind)) return { ok: false, error: 'forbidden' };
     var cell = planCell(loc.values, loc.block.col, b.ym);
     var eurRange = loc.sheet.getRange(cell.row, cell.colEur);
@@ -193,16 +216,16 @@ var USER_ACTIONS = {
   },
 
   saveGoogle: function (role, b) {
-    var loc = locateChannel(b.channel_id);
+    var loc = locateChecked(b.channel_id, b.title);
     if (role !== 'marco' || loc.block.kind !== 'google') return { ok: false, error: 'forbidden' };
     SpreadsheetApp.getActive().getSheetByName('GOOGLE').appendRow(
       [nowIso(), b.channel_id, "'" + b.date, Number(b.spent_mtd), Number(b.leads_mtd || 0), Number(b.daily_budget || 0), Boolean(b.active), role]);
-    var res = writeSpendCell(role, 'saveGoogle', b.channel_id, String(b.date).slice(0, 7), b.spent_mtd);
+    var res = writeSpendCell(role, 'saveGoogle', b.channel_id, b.title, String(b.date).slice(0, 7), b.spent_mtd);
     return { ok: true, sheet: res.skipped || 'aggiornato' };
   },
 
   metaRequest: function (role, b) {
-    var loc = locateChannel(b.channel_id);
+    var loc = locateChecked(b.channel_id, b.title);
     if (loc.block.kind !== 'meta') return { ok: false, error: 'forbidden' };
     var existing = rows('RICHIESTE META');
     var r = newMetaRequest(existing, {
@@ -233,7 +256,7 @@ var ROUTINE_ACTIONS = {
   },
   writeSpend: function (b) {
     var bad = validatePayload('writeSpend', b);
-    return bad ? { ok: false, error: bad } : writeSpendCell('routine', 'writeSpend', b.channel_id, b.ym, b.value);
+    return bad ? { ok: false, error: bad } : writeSpendCell('routine', 'writeSpend', b.channel_id, b.title, b.ym, b.value);
   },
   writeSpendBatch: function (b) {
     var out = { ok: true, written: 0, skipped: [], errors: [] };
@@ -241,7 +264,7 @@ var ROUTINE_ACTIONS = {
       try {
         var bad = validatePayload('writeSpend', it);
         if (bad) throw new Error(bad);
-        var r = writeSpendCell('routine', 'writeSpend', it.channel_id, it.ym, it.value);
+        var r = writeSpendCell('routine', 'writeSpend', it.channel_id, it.title, it.ym, it.value);
         if (r.skipped) out.skipped.push(it.channel_id + ' ' + it.ym); else out.written++;
       } catch (err) {
         out.errors.push(it.channel_id + ' ' + it.ym + ': ' + err.message);
@@ -250,17 +273,26 @@ var ROUTINE_ACTIONS = {
     return out;
   },
   upsertMapping: function (b) {
-    var sh = SpreadsheetApp.getActive().getSheetByName('MAPPA');
+    var sh = ensureHeader('MAPPA');
     var known = {};
-    rows('MAPPA').forEach(function (r) { known[String(r.campaign_id)] = true; });
+    rows('MAPPA').forEach(function (r) { known[String(r.campaign_id)] = r; });
     var added = 0;
+    var titled = 0;
     (b.rows || []).forEach(function (r) {
-      if (known[String(r.campaign_id)]) return;
-      sh.appendRow(["'" + r.account_id, "'" + r.campaign_id, "'" + String(r.campaign_name || ''), r.channel_id || '']);
-      known[String(r.campaign_id)] = true;
+      var k = known[String(r.campaign_id)];
+      if (k) {   // riga gia' presente: si aggiunge solo il titolo mancante, se il canale e' lo stesso
+        if (!k.channel_title && r.channel_title && k.channel_id === r.channel_id) {
+          updateRow('MAPPA', k._row, { channel_title: "'" + r.channel_title });
+          titled++;
+        }
+        return;
+      }
+      sh.appendRow(["'" + r.account_id, "'" + r.campaign_id, "'" + String(r.campaign_name || ''), r.channel_id || '',
+                    "'" + String(r.channel_title || '')]);
+      known[String(r.campaign_id)] = r;
       added++;
     });
-    return { ok: true, added: added };
+    return { ok: true, added: added, titled: titled };
   },
 };
 

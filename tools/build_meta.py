@@ -117,8 +117,10 @@ def _channel_for(campaign, tab, meta_channels):
     return tab + "|" + letters[0]
 
 
-def auto_mapping(campaigns, accounts, existing, meta_channels, spend_ids):
-    """Righe nuove per il tab MAPPA. Solo campagne attive o con spesa; quelle gia' mappate non si toccano."""
+def auto_mapping(campaigns, accounts, existing, meta_channels, spend_ids, titles=None):
+    """Righe nuove per il tab MAPPA. Solo campagne attive o con spesa; quelle gia' mappate non si toccano.
+    Ogni riga porta il titolo del blocco (titles: {channel_id: titolo}), che la conferma se le colonne si spostano."""
+    titles = titles or {}
     known = {str(r["campaign_id"]) for r in existing}
     rows = []
     for c in campaigns:
@@ -126,10 +128,18 @@ def auto_mapping(campaigns, accounts, existing, meta_channels, spend_ids):
         if cid in known or not (c.get("status") == "ACTIVE" or cid in spend_ids):
             continue
         tab = accounts.get(str(c["account_id"]))
+        ch = _channel_for(c, tab, meta_channels) if tab else ""
         rows.append({"account_id": str(c["account_id"]), "campaign_id": cid, "campaign_name": c["name"],
-                     "channel_id": _channel_for(c, tab, meta_channels) if tab else ""})
+                     "channel_id": ch, "channel_title": titles.get(ch, "")})
         known.add(cid)
     return rows
+
+
+def title_backfill(existing, titles):
+    """Righe MAPPA gia' assegnate ma senza titolo del blocco: ricevono il titolo di oggi (una volta sola)."""
+    return [{"account_id": str(r["account_id"]), "campaign_id": str(r["campaign_id"]), "campaign_name": r.get("campaign_name", ""),
+             "channel_id": r["channel_id"], "channel_title": titles[r["channel_id"]]}
+            for r in existing if r.get("channel_id") in titles and not r.get("channel_title")]
 
 
 def main(argv=None):
@@ -148,13 +158,15 @@ def main(argv=None):
                      for s in state["structures"]}
     merged = merge_with_previous(normalize(a.raw), prev, a.as_of)
     spend_ids = {r["campaign_id"] for r in merged["daily"] if r["spend"] > 0}
+    titles = {ch["id"]: ch["title"] for s in state["structures"] for ch in s["channels"] if ch["kind"] == "meta"}
     rows = auto_mapping(merged["campaigns"], accounts_mod.load_accounts(a.roster), state.get("mapping", []),
-                        meta_channels, spend_ids)
+                        meta_channels, spend_ids, titles)
+    backfill = title_backfill(state.get("mapping", []), titles)
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     with open(a.out, "w") as f:
         json.dump(merged, f, ensure_ascii=False, separators=(",", ":"))
     with open(a.mapping_out, "w") as f:
-        json.dump(rows, f, ensure_ascii=False, indent=1)
+        json.dump(rows + backfill, f, ensure_ascii=False, indent=1)
     failed = [k for k, v in merged["accounts"].items() if not v["ok"]]
     print(json.dumps({"accounts": len(merged["accounts"]), "failed": failed, "campaigns": len(merged["campaigns"]),
                       "daily_rows": len(merged["daily"]), "new_mapping_rows": len(rows)}))

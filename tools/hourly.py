@@ -42,6 +42,7 @@ def changes():
     h = harvest_meta.harvest(plan, harvest_meta.transcripts(0.75), RAW)
     campaigns = build_meta.normalize(RAW)["campaigns"]
     state = json.load(open(os.path.join(RAW, "state.json")))
+    titles = {ch["id"]: ch["title"] for s in state["structures"] for ch in s["channels"]}
     out = []
     for r in json.load(open(os.path.join(RAW, "pending.json"))):
         acc = sorted(a for a, tab in accounts_for_requests([r], state["mapping"]).items())
@@ -49,7 +50,8 @@ def changes():
         out.append({"request_id": r["id"], "channel_id": r["channel_id"], "eur": r["eur"],
                     "ad_account_id": acc[0] if len(acc) == 1 else acc,
                     "lettura_fallita": failed,
-                    "changes": [] if failed else apply_plan.plan_changes(r, campaigns, state["mapping"])})
+                    "changes": [] if failed else apply_plan.plan_changes(r, campaigns, state["mapping"],
+                                                                         titles.get(r["channel_id"]))})
     with open(os.path.join(RAW, "changes.json"), "w") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
     print(json.dumps(out, ensure_ascii=False, indent=1))

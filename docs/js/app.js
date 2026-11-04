@@ -67,9 +67,12 @@ export function render() {
   $('freshness').textContent = `Meta aggiornato al ${ddmm(asOf)} · Google inserito da Marco${isDemo() ? ' · DATI DI PROVA' : (SHEET_LABEL ? ` · ${SHEET_LABEL}` : '')}`;
 
   const stale = staleAccounts(state, meta);
-  $('banners').innerHTML = stale.length
+  const skipped = state.skipped_tabs || [];
+  $('banners').innerHTML = (stale.length
     ? `<div class="banner">Dati Meta fermi per ${stale.map(a => `<b>${esc(a.name)}</b> (ultimo dato ${ddmm(a.last_ok)})`).join(', ')}.</div>`
-    : '';
+    : '') + (skipped.length
+    ? `<div class="banner">Nello Sheet non trovo i blocchi budget di ${skipped.map(t => `<b>${esc(t)}</b>`).join(', ')}: la riga dei titoli (riga 13) è stata spostata? Finché non si sistema, queste strutture non compaiono qui.</div>`
+    : '');
 
   const cards = buildCards(state, meta, ym, asOf);
   const off = cards.filter(c => c.overall === 'under' || c.overall === 'over');

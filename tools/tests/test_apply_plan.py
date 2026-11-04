@@ -92,3 +92,17 @@ class Hourly(unittest.TestCase):
                    {"account_id": "3", "campaign_id": "d", "channel_id": "Brora|A"}]
         reqs = [{"id": "r1", "channel_id": "Helios|A"}, {"id": "r2", "channel_id": "Ciccio|A"}]
         self.assertEqual(hourly.accounts_for_requests(reqs, mapping), {"1": "Helios", "2": "Ciccio"})
+
+
+class TitleCheck(unittest.TestCase):
+    """Review I1: una riga MAPPA con il titolo di un altro blocco non riceve il budget."""
+
+    def test_rows_of_another_block_are_skipped(self):
+        mapping = [{"campaign_id": "ita", "channel_id": "Cirillo|A", "channel_title": "BUDGET FACEBOOK ADS ITALIA"},
+                   {"campaign_id": "est", "channel_id": "Cirillo|A", "channel_title": "BUDGET FACEBOOK ADS ESTERO"},
+                   {"campaign_id": "old", "channel_id": "Cirillo|A"}]
+        req = {"id": "r1", "channel_id": "Cirillo|A", "eur": 50, "status": "pending"}
+        ch = apply_plan.plan_changes(req, [camp("ita", 30), camp("est", 20), camp("old", 10)], mapping,
+                                     channel_title="BUDGET FACEBOOK ADS ESTERO")
+        self.assertEqual(sorted(c["entity_id"] for c in ch), ["est", "old"])
+

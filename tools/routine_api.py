@@ -41,7 +41,7 @@ def post(action, payload):
 def sync_spend(meta_path):
     meta = json.load(open(meta_path))
     state = get_state()
-    channels = [ch["id"] for s in state["structures"] for ch in s["channels"] if ch["kind"] == "meta"]
+    channels = {ch["id"]: ch["title"] for s in state["structures"] for ch in s["channels"] if ch["kind"] == "meta"}
     as_of = meta["as_of"]
     y, m = int(as_of[:4]), int(as_of[5:7])
     prev = "%04d-%02d" % ((y - 1, 12) if m == 1 else (y, m - 1))

@@ -189,11 +189,19 @@ function validatePayload(action, b) {
   return '';
 }
 
+// Il canale si identifica da tab e lettera di colonna; il titolo del blocco conferma che è ancora lo stesso.
+function titleMismatch(block, sent, tab) {
+  if (sent === undefined || sent === null || sent === '') return 'pagina da ricaricare: manca il nome del blocco';
+  var norm = function (t) { return String(t).replace(/\s+/g, ' ').trim().toUpperCase(); };
+  if (norm(block.title) === norm(sent)) return '';
+  return 'lo Sheet è cambiato: nel tab ' + tab + ' la colonna ' + block.letter + ' ora è "' + block.title + '". Ricarica la pagina.';
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     LAYOUT: LAYOUT, monthsList: monthsList, monthLabel: monthLabel, colLetter: colLetter,
     findBlocks: findBlocks, readMonths: readMonths, channelId: channelId, planCell: planCell,
     roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote,
-    spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, dueRequests: dueRequests, ymOf: ymOf, fitsCache: fitsCache,
+    spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, titleMismatch: titleMismatch, dueRequests: dueRequests, ymOf: ymOf, fitsCache: fitsCache,
   };
 }

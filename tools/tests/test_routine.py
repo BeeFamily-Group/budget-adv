@@ -172,13 +172,24 @@ class Spend(unittest.TestCase):
                           {"campaign_id": "zz", "date": "2026-11-01", "spend": 9.0, "leads": 0}]}
         mapping = [{"campaign_id": "s27", "channel_id": "Ciccio|A"}, {"campaign_id": "h26", "channel_id": "Ciccio|A"},
                    {"campaign_id": "zz", "channel_id": ""}]
-        items = spend.spend_items(meta, mapping, ["Ciccio|A", "Brora|A"], ["2026-10", "2026-11"])
-        self.assertEqual(items, [{"channel_id": "Ciccio|A", "ym": "2026-10", "value": 55.53},
-                                 {"channel_id": "Ciccio|A", "ym": "2026-11", "value": 83.2}])
+        items = spend.spend_items(meta, mapping, {"Ciccio|A": "BUDGET FACEBOOK ADS", "Brora|A": "BUDGET FACEBOOK ADS"},
+                                  ["2026-10", "2026-11"])
+        self.assertEqual(items, [{"channel_id": "Ciccio|A", "title": "BUDGET FACEBOOK ADS", "ym": "2026-10", "value": 55.53},
+                                 {"channel_id": "Ciccio|A", "title": "BUDGET FACEBOOK ADS", "ym": "2026-11", "value": 83.2}])
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SpendTitles(unittest.TestCase):
+    def test_rows_with_another_title_are_not_written(self):
+        meta = {"daily": [{"campaign_id": "ita", "date": "2026-11-01", "spend": 10.0, "leads": 1},
+                          {"campaign_id": "est", "date": "2026-11-01", "spend": 7.0, "leads": 1}]}
+        mapping = [{"campaign_id": "ita", "channel_id": "Cirillo|A", "channel_title": "BUDGET FACEBOOK ADS ITALIA"},
+                   {"campaign_id": "est", "channel_id": "Cirillo|A", "channel_title": "BUDGET FACEBOOK ADS ESTERO"}]
+        items = spend.spend_items(meta, mapping, {"Cirillo|A": "BUDGET FACEBOOK ADS ESTERO"}, ["2026-11"])
+        self.assertEqual(items, [{"channel_id": "Cirillo|A", "title": "BUDGET FACEBOOK ADS ESTERO", "ym": "2026-11", "value": 7.0}])
 
 
 class FreshRead(unittest.TestCase):
