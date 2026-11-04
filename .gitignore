@@ -6,3 +6,4 @@ node_modules/
 __pycache__/
 .clasp.json
 raw_hourly/
+.clasp-*.json
