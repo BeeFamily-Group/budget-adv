@@ -5,26 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Budget ADV BeeFamily</title>
   <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#faf7f2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="top">
-    <div class="top-row">
-      <div>
-        <h1>Budget ADV <span>BeeFamily</span></h1>
-        <p class="sub" id="freshness">Caricamento…</p>
-      </div>
+  <header class="topbar">
+    <div class="brand"><span class="mark" aria-hidden="true">B</span><span>Budget ADV <em>BeeFamily</em></span></div>
+    <div class="top-right">
+      <span class="fresh" id="freshness">Caricamento…</span>
       <button class="who" id="who" type="button">Accedi</button>
     </div>
-    <nav class="months" id="months" aria-label="Mese"></nav>
-    <div class="toolbar">
-      <label class="toggle"><input type="checkbox" id="onlyOff"> Solo fuori ritmo</label>
-      <span class="sub" id="count"></span>
-    </div>
   </header>
-  <main>
+  <main class="page">
+    <div class="page-head">
+      <h1>Strutture</h1>
+      <p class="sub" id="count"></p>
+    </div>
+    <div class="filters">
+      <label class="search">
+        <svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+        <input id="q" type="search" placeholder="Cerca una struttura" autocomplete="off" spellcheck="false" aria-label="Cerca una struttura">
+        <kbd aria-hidden="true">/</kbd>
+      </label>
+      <button class="pill" id="onlyOff" type="button" aria-pressed="false">Solo fuori ritmo <span class="count" id="offCount"></span></button>
+    </div>
+    <nav class="months" id="months" aria-label="Mese"></nav>
     <div id="banners"></div>
-    <section id="cards" class="cards" aria-live="polite"></section>
+    <section id="overview" class="panel trend" aria-label="Andamento"><div class="skel" style="height:236px"></div></section>
+    <section id="cards" class="cards" aria-live="polite" aria-busy="true"><div class="skel card-skel"></div><div class="skel card-skel"></div><div class="skel card-skel"></div></section>
     <section id="unassigned"></section>
   </main>
   <div id="detail" class="detail" hidden></div>

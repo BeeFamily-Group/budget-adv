@@ -1,16 +1,21 @@
-// Schermata principale: mesi, schede per struttura, campagne da assegnare.
+// Schermata principale: ricerca, mesi, andamento, schede per struttura, campagne da assegnare.
 import { getState, getMeta, isDemo } from './api.js';
-import { buildCards, unassigned, channelLabel, stateLabel, staleAccounts, staleText, macLate } from './viewmodel.js';
+import { buildCards, unassigned, channelLabel, stateLabel, staleAccounts, staleText, macLate, trendDaily, matchQuery } from './viewmodel.js';
 import { fmtEur } from './calc.js';
+import { icon } from './icons.js';
+import { mountTrend } from './trend.js';
 import { SHEET_LABEL } from '../config.js';
 
-export const store = { state: null, meta: null, ym: null, asOf: null, onlyOff: false, role: null, code: null };
+export const store = { state: null, meta: null, ym: null, asOf: null, today: null, q: '', onlyOff: false, role: null, code: null };
 
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const ddmm = (d) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : '—');
 const MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+const MESI_LUNGHI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 export const monthShort = (ym) => `${MESI[Number(ym.slice(5, 7)) - 1]} ${ym.slice(2, 4)}`;
+export const monthLong = (ym) => `${MESI_LUNGHI[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
+export const toneOf = (state) => ({ ok: 'good', under: 'amber', over: 'bad', early: 'bad' }[state] || 'neutral');
 
 export function pctHtml(v, goodWhenUp) {
   if (v === null || v === undefined) return '<span class="neutral">—</span>';
@@ -25,30 +30,29 @@ export function kpiHtml(k) {
       <div class="kpi"><div class="l">Spesa 7 gg</div><div class="v">${fmtEur(k.cur.spend)}</div><div class="d">${pctHtml(k.pct.spend, null)}</div></div>
       <div class="kpi"><div class="l">Lead 7 gg</div><div class="v">${k.cur.leads}</div><div class="d">${pctHtml(k.pct.leads, true)}</div></div>
       <div class="kpi"><div class="l">Costo per lead</div><div class="v">${cpl}</div><div class="d">${pctHtml(k.pct.cpl, false)}</div></div>
-    </div>
-    <div class="small">Ultimi 7 giorni rispetto ai 7 prima · solo Meta</div>`;
+    </div>`;
 }
 
 export function barHtml(c) {
   const fill = c.programmed > 0 ? Math.min(c.spent / c.programmed, 1) * 100 : (c.spent > 0 ? 100 : 0);
-  const mark = c.programmed > 0 ? Math.min(c.expected / c.programmed, 1) * 100 : null;
-  return `<div class="bar"><i class="${c.state}" style="width:${fill.toFixed(1)}%"></i>${mark === null ? '' : `<b style="left:${mark.toFixed(1)}%"></b>`}</div>`;
+  const mark = c.programmed > 0 && c.expected > 0 ? Math.min(c.expected / c.programmed, 1) * 100 : null;
+  return `<div class="bar" aria-hidden="true"><i class="${c.state}" style="width:${fill.toFixed(1)}%"></i>${mark === null ? '' : `<b style="left:${mark.toFixed(1)}%" title="dove dovresti essere oggi"></b>`}</div>`;
 }
 
 function channelHtml(c) {
-  let right = '';
-  if (c.kind === 'meta') right = c.perDay !== null && c.programmed > 0 ? `serve ${fmtEur(c.perDay)}/g` : '';
-  else right = c.updatedOn
-    ? `${c.perDay !== null && c.programmed > 0 ? `serve ${fmtEur(c.perDay)}/g · ` : ''}Marco ${ddmm(c.updatedOn)}`
-    : 'Marco: da inserire';
+  const close = c.perDay !== null && c.programmed > 0 && c.remaining > 0 ? `servono ${fmtEur(c.perDay)}/g` : '';
+  const foot = c.kind === 'meta' ? close
+    : (c.updatedOn ? [close, `Marco ${ddmm(c.updatedOn)}`].filter(Boolean).join(' · ') : 'Marco: numeri da inserire');
   const flags = [];
-  if (c.dataStaleSince) flags.push(`dati Meta ${staleText(c.dataStaleSince)}`);
-  if (c.kind === 'google' && c.stale && c.programmed > 0) flags.push('Google non aggiornato da più di 7 giorni');
-  if (c.sheetMismatch !== null && c.sheetMismatch !== undefined) flags.push(`nello Sheet ${fmtEur(c.sheetMismatch)}`);
-  return `<div>
-      <div class="ch-row"><span>${esc(channelLabel(c.title))} <b>${fmtEur(c.spent)}</b> / ${fmtEur(c.programmed)}</span><span>${esc(right)}</span></div>
+  if (c.dataStaleSince) flags.push(`Dati Meta ${staleText(c.dataStaleSince)}`);
+  if (c.kind === 'google' && c.updatedOn && c.stale && c.programmed > 0) flags.push('Google non aggiornato da più di 7 giorni');
+  if (c.sheetMismatch !== null && c.sheetMismatch !== undefined) flags.push(`Nello Sheet ${fmtEur(c.sheetMismatch)}: diverso dallo speso`);
+  return `<div class="ch">
+      <div class="ch-top"><span class="plat ${c.kind}"><i></i>${esc(channelLabel(c.title))}</span>
+        <span class="ch-num"><b>${fmtEur(c.spent)}</b> di ${fmtEur(c.programmed)}</span></div>
       ${barHtml(c)}
-      ${flags.map(f => `<div class="warn">${esc(f)}</div>`).join('')}
+      <div class="ch-foot"><span>${esc(foot)}</span><span class="${toneOf(c.state)}">${esc(stateLabel(c.state, c.pct))}</span></div>
+      ${flags.map(f => `<div class="warn">${icon('alert', 13)}${esc(f)}</div>`).join('')}
     </div>`;
 }
 
@@ -56,43 +60,65 @@ function cardHtml(card) {
   const main = card.channels.find(c => c.state === card.overall) || card.channels[0];
   const chip = main ? `<span class="chip ${card.overall}">${esc(stateLabel(card.overall, main.pct))}</span>` : '';
   return `<button class="card" type="button" data-tab="${esc(card.tab)}" aria-label="Apri ${esc(card.name)}">
-      <div class="card-head"><h3>${esc(card.name)}</h3>${chip}</div>
+      <div class="card-head"><h3>${esc(card.name)}</h3><span class="right">${chip}<span class="go">${icon('arrowRight', 16)}</span></span></div>
       ${card.channels.map(channelHtml).join('')}
-      ${kpiHtml(card.kpi7)}
-      ${card.caveat ? `<div class="caveat">${esc(card.caveat)}</div>` : ''}
+      ${card.kpi7 ? `${kpiHtml(card.kpi7)}<div class="card-foot"><span>Ultimi 7 giorni rispetto ai 7 prima · solo Meta</span></div>` : ''}
     </button>`;
+}
+
+function bannersHtml(state, meta) {
+  const out = [];
+  const late = macLate(meta.as_of, store.today);
+  if (late === null || late > 0) {
+    out.push(`<b>Dati Meta ${meta.as_of ? `fermi al ${ddmm(meta.as_of)}` : 'non ancora arrivati'}.</b> La routine notturna non è partita, di solito perché il Mac di Francesco era spento: si aggiorna da sola alla prima notte con il Mac acceso, e le modifiche Meta restano in attesa.`);
+  }
+  const stale = staleAccounts(state, meta);
+  if (stale.length) {
+    out.push(`<b>Dati Meta non aggiornati</b> per ${stale.map(a => `${esc(a.name)} (${a.last_ok ? `ultimo dato ${ddmm(a.last_ok)}` : 'mai letti'})`).join(', ')}: la dashboard tiene l'ultimo dato buono.`);
+  }
+  const skipped = state.skipped_tabs || [];
+  if (skipped.length) {
+    out.push(`<b>Blocchi budget non trovati</b> nello Sheet per ${skipped.map(t => esc(t)).join(', ')}: la riga dei titoli (riga 13) è stata spostata? Finché non si sistema, queste strutture non compaiono qui.`);
+  }
+  return out.map(t => `<div class="banner" role="status">${icon('alert', 16)}<span>${t}</span></div>`).join('');
 }
 
 export function render() {
   const { state, meta, ym, asOf } = store;
   const yms = state.structures[0]?.channels[0]?.months.map(m => m.ym) || [];
-  $('months').innerHTML = yms.map(y => `<button type="button" data-ym="${y}" aria-pressed="${y === ym}">${monthShort(y)}</button>`).join('');
-  $('freshness').textContent = `Meta aggiornato al ${ddmm(asOf)} · Google inserito da Marco${isDemo() ? ' · DATI DI PROVA' : (SHEET_LABEL ? ` · ${SHEET_LABEL}` : '')}`;
-
-  const stale = staleAccounts(state, meta);
-  const late = macLate(meta.as_of, store.today);
-  const mac = late === null || late > 0
-    ? `<div class="banner"><b>Dati Meta ${meta.as_of ? `fermi al ${ddmm(meta.as_of)}` : 'non ancora arrivati'}</b>: la routine notturna non è partita, di solito perché il Mac di Francesco era spento. Si aggiorna da sola alla prima notte con il Mac acceso; le modifiche Meta restano in attesa.</div>`
-    : '';
-  const skipped = state.skipped_tabs || [];
-  $('banners').innerHTML = mac + (stale.length
-    ? `<div class="banner">Dati Meta ${stale.map(a => `<b>${esc(a.name)}</b> (${a.last_ok ? `ultimo dato ${ddmm(a.last_ok)}` : 'mai letti'})`).join(', ')}: la dashboard tiene l'ultimo dato buono.</div>`
-    : '') + (skipped.length
-    ? `<div class="banner">Nello Sheet non trovo i blocchi budget di ${skipped.map(t => `<b>${esc(t)}</b>`).join(', ')}: la riga dei titoli (riga 13) è stata spostata? Finché non si sistema, queste strutture non compaiono qui.</div>`
-    : '');
+  const nowYm = (store.today || asOf).slice(0, 7);
+  $('months').innerHTML = yms.map(y => `<button type="button" data-ym="${y}" aria-pressed="${y === ym}"${y === nowYm ? ' class="now" title="mese in corso"' : ''}>${monthShort(y)}</button>`).join('');
+  $('freshness').textContent = `Meta aggiornato al ${ddmm(asOf)} · Google da Marco${isDemo() ? ' · DATI DI PROVA' : (SHEET_LABEL ? ` · ${SHEET_LABEL}` : '')}`;
+  $('banners').innerHTML = bannersHtml(state, meta);
 
   const cards = buildCards(state, meta, ym, asOf, store.today);
-  const off = cards.filter(c => c.overall === 'under' || c.overall === 'over' || c.overall === 'early');
-  const shown = store.onlyOff ? off : cards;
-  $('count').textContent = `${cards.length} strutture · ${off.length} fuori ritmo`;
-  $('cards').innerHTML = shown.length ? shown.map(cardHtml).join('') : '<p class="empty">Nessuna struttura fuori ritmo in questo mese.</p>';
+  const offOf = (c) => c.overall === 'under' || c.overall === 'over' || c.overall === 'early';
+  const found = cards.filter(c => matchQuery(c.name, store.q));
+  const shown = store.onlyOff ? found.filter(offOf) : found;
+  const off = cards.filter(offOf).length;
+  $('offCount').textContent = off ? String(off) : '';
+  $('onlyOff').setAttribute('aria-pressed', String(store.onlyOff));
+  $('count').textContent = `${monthLong(ym)} · ${shown.length === cards.length ? `${cards.length} strutture` : `${shown.length} di ${cards.length} strutture`} · ${off} fuori ritmo`;
+
+  let empty = '';
+  if (!shown.length) {
+    empty = store.q
+      ? `<div class="empty">Nessuna struttura per «${esc(store.q)}»${store.onlyOff ? ' fuori ritmo' : ''}. <button class="pill" type="button" data-clear>${icon('x', 14)}Azzera la ricerca</button></div>`
+      : '<p class="empty">Nessuna struttura fuori ritmo in questo mese.</p>';
+  }
+  $('cards').innerHTML = shown.length ? shown.map(cardHtml).join('') : empty;
+  $('cards').setAttribute('aria-busy', 'false');
+
+  const scope = shown.length === cards.length ? `tutte le ${cards.length} strutture`
+    : (shown.length === 1 ? shown[0].name : `${shown.length} strutture filtrate`);
+  mountTrend($('overview'), { daily: trendDaily(state, meta, shown.map(c => c.tab), asOf), scope, key: 'home' });
 
   const un = unassigned(state, meta, ym, asOf);
   $('unassigned').innerHTML = un.length
-    ? `<div class="box"><h2>Campagne da assegnare</h2>
-        <p class="small">Hanno speso in questo mese ma non sono collegate a nessuna struttura: correggi il tab MAPPA dello Sheet.</p>
-        <table class="t"><tr><th>Campagna</th><th>Account</th><th>Speso</th></tr>
-        ${un.map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.account_id)}</td><td>${fmtEur(u.spent)}</td></tr>`).join('')}</table></div>`
+    ? `<div class="box"><div class="box-head"><div><h2>Campagne da assegnare</h2>
+        <p class="small">Hanno speso a ${monthLong(ym)} ma non sono collegate a nessuna struttura: correggi il tab MAPPA dello Sheet.</p></div></div>
+        <div class="scroll-x"><table class="t"><thead><tr><th>Campagna</th><th>Account</th><th>Speso</th></tr></thead>
+        <tbody>${un.map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.account_id)}</td><td>${fmtEur(u.spent)}</td></tr>`).join('')}</tbody></table></div></div>`
     : '';
 }
 
@@ -122,17 +148,27 @@ function init() {
     store.ym = b.dataset.ym;
     render();
   });
-  $('onlyOff').addEventListener('change', (e) => { store.onlyOff = e.target.checked; render(); });
+  $('onlyOff').addEventListener('click', () => { store.onlyOff = !store.onlyOff; render(); });
+  $('q').addEventListener('input', (e) => { store.q = e.target.value; render(); });
+  $('q').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && e.target.value) { e.target.value = ''; store.q = ''; render(); }
+  });
+  document.addEventListener('keydown', (e) => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+    if (e.key === '/' && !typing && $('detail').hidden && $('dialog').hidden) { e.preventDefault(); $('q').focus(); }
+  });
   $('cards').addEventListener('click', (e) => {
+    if (e.target.closest('[data-clear]')) { $('q').value = ''; store.q = ''; render(); $('q').focus(); return; }
     const b = e.target.closest('.card');
     if (b) openDetail(b.dataset.tab);
   });
   $('who').addEventListener('click', async () => {
     try { (await import('./auth.js')).openLogin(); } catch (e) { console.error(e); }
   });
+  document.body.classList.add('first-paint');
   reload()
-    .then(() => import('./auth.js').then(m => m.restore()))
-    .catch((e) => { $('freshness').textContent = `Errore nel caricamento: ${e.message}`; });
+    .then(() => { setTimeout(() => document.body.classList.remove('first-paint'), 700); return import('./auth.js').then(m => m.restore()); })
+    .catch((e) => { $('freshness').textContent = `Errore nel caricamento: ${e.message}`; $('count').textContent = 'Dati non disponibili: riprova tra poco.'; });
 }
 
 init();
