@@ -96,6 +96,17 @@ class Normalize(unittest.TestCase):
         self.assertEqual(by_id["s27"]["daily_budget"], 60)
         self.assertEqual(by_id["h26"]["status"], "NOT_ACTIVE")
 
+    def test_empty_days_without_id_skipped(self):
+        with tempfile.TemporaryDirectory() as d:
+            write(d, "421004342260012_campaigns.json", [])
+            write(d, "421004342260012_adsets.json", [])
+            write(d, "421004342260012_daily.json",
+                  [{"date_start": "2026-11-02", "date_stop": "2026-11-02"},
+                   {"date_start": "2026-11-01", "date_stop": "2026-11-01", "amount_spent": eur("15.01"),
+                    "lead": "1", "id": "h26", "name": "HALLOWEEN_2026"}])
+            out = build_meta.normalize(d)
+        self.assertEqual([r["campaign_id"] for r in out["daily"]], ["h26"])
+
     def test_failed_account_keeps_previous(self):
         prev = {"as_of": "2026-11-13",
                 "accounts": {"433491253104777": {"ok": True, "error": None, "last_ok": "2026-11-13"}},

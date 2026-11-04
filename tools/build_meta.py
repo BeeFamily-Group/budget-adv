@@ -75,6 +75,8 @@ def normalize(raw_dir):
             campaigns[cid] = {"id": cid, "account_id": acc, "name": c.get("name", ""), "status": c.get("effective_status"),
                               "daily_budget": budget, "budget_level": level, "adsets": adsets}
         for r in _load(os.path.join(raw_dir, acc + "_daily.json")):
+            if "id" not in r:  # Meta riempie i giorni senza spesa con righe vuote senza id
+                continue
             cid = str(r["id"])
             if cid not in campaigns:
                 campaigns[cid] = {"id": cid, "account_id": acc, "name": r.get("name", ""), "status": "NOT_ACTIVE",
