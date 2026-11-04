@@ -28,6 +28,7 @@ function json(obj) {
 }
 
 function nowIso() { return new Date().toISOString(); }
+function todayRome() { return Utilities.formatDate(new Date(), 'Europe/Rome', 'yyyy-MM-dd'); }
 
 function setup() {
   var ss = SpreadsheetApp.getActive();
@@ -106,26 +107,43 @@ function buildState() {
   };
 }
 
-var CACHE_KEY = 'state-v1';
 var CACHE_SECONDS = 300;   // le modifiche fatte a mano nello Sheet compaiono entro 5 minuti
+var CACHE_CHUNK = 90000;   // una voce di cache tiene al massimo 100 KB
+
+// Ogni scrittura incrementa la versione: la cache di una versione vecchia non viene piu' letta,
+// e una lettura iniziata prima di una scrittura non la rimette in cache.
+function stateVersion() { return PropertiesService.getScriptProperties().getProperty('STATE_VER') || '0'; }
+function bumpStateVersion() {
+  var p = PropertiesService.getScriptProperties();
+  p.setProperty('STATE_VER', String(Number(p.getProperty('STATE_VER') || 0) + 1));
+}
 
 function cachedStateText() {
   var cache = CacheService.getScriptCache();
-  var hit = cache.get(CACHE_KEY);
-  if (hit) return hit;
+  var ver = stateVersion();
+  var key = 'state-' + ver;
+  var n = Number(cache.get(key + '-n') || 0);
+  if (n > 0) {
+    var keys = [];
+    for (var i = 0; i < n; i++) keys.push(key + '-' + i);
+    var got = cache.getAll(keys);
+    if (keys.every(function (k) { return typeof got[k] === 'string'; })) return keys.map(function (k) { return got[k]; }).join('');
+  }
   var text = JSON.stringify(buildState());
-  if (fitsCache(text)) cache.put(CACHE_KEY, text, CACHE_SECONDS);
+  var parts = chunkText(text, CACHE_CHUNK);
+  if (parts.length <= 20 && stateVersion() === ver) {
+    var obj = {};
+    parts.forEach(function (part, j) { obj[key + '-' + j] = part; });
+    cache.putAll(obj, CACHE_SECONDS);
+    cache.put(key + '-n', String(parts.length), CACHE_SECONDS);
+  }
   return text;
-}
-
-function dropCache() {
-  CacheService.getScriptCache().remove(CACHE_KEY);
 }
 
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'state';
   if (action === 'state') {
-    if (e.parameter.fresh) dropCache();
+    if (e.parameter.fresh) bumpStateVersion();
     return ContentService.createTextOutput(cachedStateText()).setMimeType(ContentService.MimeType.JSON);
   }
   return json({ ok: false, error: 'azione sconosciuta' });
@@ -136,12 +154,16 @@ function log(who, action, cell, before, after) {
 }
 
 // Ultimo valore scritto dal sistema (routine o modulo Google) in una cella: serve a non sovrascrivere i valori a mano.
+// Il LOG si legge una volta sola per richiesta.
+var SYS_WRITES = null;
 function lastSystemWrite(cellA1) {
-  var log_ = rows('LOG');
-  for (var i = log_.length - 1; i >= 0; i--) {
-    if (log_[i].cell === cellA1 && (log_[i].action === 'writeSpend' || log_[i].action === 'saveGoogle')) return log_[i].after;
+  if (!SYS_WRITES) {
+    SYS_WRITES = {};
+    rows('LOG').forEach(function (r) {
+      if (r.action === 'writeSpend' || r.action === 'saveGoogle') SYS_WRITES[r.cell] = r.after;
+    });
   }
-  return null;
+  return Object.prototype.hasOwnProperty.call(SYS_WRITES, cellA1) ? SYS_WRITES[cellA1] : null;
 }
 
 function locateChannel(channel_id) {
@@ -168,10 +190,12 @@ function writeSpendCell(who, action, channel_id, title, ym, value) {
   var range = loc.sheet.getRange(cell.row, cell.colSpend);
   var a1 = loc.sheet.getName() + '!' + range.getA1Notation();
   var before = range.getValue();
-  if (!spendWritable(before, lastSystemWrite(a1))) return { ok: true, skipped: 'valore inserito a mano' };
   var rounded = Math.round(Number(value) * 100) / 100;
+  if (before !== '' && Number(before) === rounded) return { ok: true, unchanged: true };   // niente riga di LOG inutile
+  if (!spendWritable(before, lastSystemWrite(a1))) return { ok: true, skipped: 'valore inserito a mano' };
   range.setValue(rounded);
   log(who, action, a1, before, rounded);
+  if (SYS_WRITES) SYS_WRITES[a1] = rounded;
   return { ok: true };
 }
 
@@ -246,12 +270,19 @@ var USER_ACTIONS = {
 
 var ROUTINE_ACTIONS = {
   pendingRequests: function (b) {
-    return { ok: true, requests: strip(dueRequests(rows('RICHIESTE META'), String(b.now || nowIso()).slice(0, 10))) };
+    var today = String(b.now || todayRome()).slice(0, 10);
+    var all = rows('RICHIESTE META');
+    expiredRequests(all, today).forEach(function (r) {
+      updateRow('RICHIESTE META', r._row, { status: 'expired', result: "'mese finito prima che la modifica fosse applicata", updated_at: nowIso() });
+    });
+    return { ok: true, requests: strip(dueRequests(all, today)) };
   },
   requestResult: function (b) {
     var row = rows('RICHIESTE META').filter(function (r) { return r.id === b.id; })[0];
     if (!row) return { ok: false, error: 'richiesta sconosciuta' };
-    updateRow('RICHIESTE META', row._row, { status: b.status, result: "'" + String(b.result || '').slice(0, 1000), updated_at: nowIso() });
+    var prefix = row.status === 'superseded' ? '(sostituita nel frattempo) ' : '';
+    updateRow('RICHIESTE META', row._row, { status: resultStatus(row.status, b.status),
+      result: "'" + prefix + String(b.result || '').slice(0, 1000), updated_at: nowIso() });
     return { ok: true };
   },
   writeSpend: function (b) {
@@ -259,19 +290,33 @@ var ROUTINE_ACTIONS = {
     return bad ? { ok: false, error: bad } : writeSpendCell('routine', 'writeSpend', b.channel_id, b.title, b.ym, b.value);
   },
   writeSpendBatch: function (b) {
-    var out = { ok: true, written: 0, skipped: [], errors: [] };
+    var out = { ok: true, written: 0, unchanged: 0, skipped: [], errors: [] };
     (b.items || []).forEach(function (it) {
       try {
         var bad = validatePayload('writeSpend', it);
         if (bad) throw new Error(bad);
         var r = writeSpendCell('routine', 'writeSpend', it.channel_id, it.title, it.ym, it.value);
-        if (r.skipped) out.skipped.push(it.channel_id + ' ' + it.ym); else out.written++;
+        if (r.skipped) out.skipped.push(it.channel_id + ' ' + it.ym);
+        else if (r.unchanged) out.unchanged++;
+        else out.written++;
       } catch (err) {
         out.errors.push(it.channel_id + ' ' + it.ym + ': ' + err.message);
       }
     });
     return out;
   },
+  rotateCodes: function (b) {
+    var p = PropertiesService.getScriptProperties();
+    var changed = [];
+    ROLES.forEach(function (r) {
+      var hh = b.hashes && b.hashes[r];
+      if (hh && /^[0-9a-f]{64}$/.test(hh)) { p.setProperty('HASH_' + r, hh); changed.push(r); }
+    });
+    p.setProperty('BOOTSTRAPPED', '1');
+    if (changed.length) log('routine', 'rotateCodes', changed.join(','), '', '');
+    return { ok: true, changed: changed };
+  },
+
   upsertMapping: function (b) {
     var sh = ensureHeader('MAPPA');
     var known = {};
@@ -300,34 +345,41 @@ function doPost(e) {
   var body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return json({ ok: false, error: 'json non valido' }); }
   var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
   try {
-    var h = hashes();
+    var props = PropertiesService.getScriptProperties();
     if (body.action === 'bootstrap') {
-      // Una sola volta: salva gli hash dei codici e crea i tab di servizio. Poi resta chiuso.
-      if (h.francesco) return json({ ok: false, error: 'gia configurato' });
-      var p = PropertiesService.getScriptProperties();
-      ROLES.forEach(function (r) { if (body.hashes && body.hashes[r]) p.setProperty('HASH_' + r, body.hashes[r]); });
+      // Una sola volta: salva gli hash dei codici e crea i tab di servizio. Poi resta chiuso per sempre.
+      if (!lock.tryLock(20000)) return json({ ok: false, error: 'occupato, riprova tra un minuto' });
+      if (bootstrapClosed(props.getProperties())) return json({ ok: false, error: 'gia configurato' });
+      ROLES.forEach(function (r) { if (body.hashes && body.hashes[r]) props.setProperty('HASH_' + r, body.hashes[r]); });
+      props.setProperty('BOOTSTRAPPED', '1');
       setup();
       return json({ ok: true });
     }
+    var h = hashes();
+    var role = null;
+    var actions;
     if (body.routine_key) {
       if (!h.routine || sha256(String(body.routine_key)) !== h.routine) return json({ ok: false, error: 'chiave non valida' });
-      var ra = ROUTINE_ACTIONS[body.action];
-      if (body.action !== 'pendingRequests') dropCache();
-      return json(ra ? ra(body) : { ok: false, error: 'azione sconosciuta' });
+      actions = ROUTINE_ACTIONS;
+    } else {
+      role = roleFromCode(body.code, { francesco: h.francesco, marco: h.marco, ambra: h.ambra }, sha256);
+      if (!role) return json({ ok: false, error: 'codice non valido' });
+      if (body.action === 'whoami') return json({ ok: true, role: role });   // nessun lock: solo il confronto del codice
+      var bad = validatePayload(body.action, body);
+      if (bad) return json({ ok: false, error: bad });
+      actions = USER_ACTIONS;
     }
-    var userHashes = { francesco: h.francesco, marco: h.marco, ambra: h.ambra };
-    var role = roleFromCode(body.code, userHashes, sha256);
-    if (!role) return json({ ok: false, error: 'codice non valido' });
-    var ua = USER_ACTIONS[body.action];
-    var bad = validatePayload(body.action, body);
-    if (bad) return json({ ok: false, error: bad });
-    if (body.action !== 'whoami') dropCache();
-    return json(ua ? ua(role, body) : { ok: false, error: 'azione sconosciuta' });
+    var fn = actions[body.action];
+    if (!fn) return json({ ok: false, error: 'azione sconosciuta' });
+    if (!lock.tryLock(20000)) return json({ ok: false, error: 'lo Sheet è occupato da un altro salvataggio: riprova tra un minuto' });
+    var out = body.routine_key ? fn(body) : fn(role, body);
+    SpreadsheetApp.flush();
+    bumpStateVersion();   // dopo la scrittura: la prossima lettura vede i dati nuovi
+    return json(out);
   } catch (err) {
     return json({ ok: false, error: String(err && err.message || err) });
   } finally {
-    lock.releaseLock();
+    if (lock.hasLock()) lock.releaseLock();
   }
 }

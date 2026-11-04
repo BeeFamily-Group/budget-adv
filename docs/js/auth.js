@@ -17,10 +17,14 @@ function paintButton() {
 export async function restore() {
   const code = saved();
   if (!code) return paintButton();
-  const r = await post('whoami', {}, code).catch(() => ({ ok: false }));
+  let r = await post('whoami', {}, code).catch(() => ({ ok: false }));
+  if (!r.ok && r.error !== 'codice non valido') {   // errore passeggero: si riprova una volta, il codice resta salvato
+    await new Promise(res => setTimeout(res, 2000));
+    r = await post('whoami', {}, code).catch(() => ({ ok: false }));
+  }
   store.code = r.ok ? code : null;
   store.role = r.ok ? r.role : null;
-  if (!r.ok) save('');
+  if (r.error === 'codice non valido') save('');
   paintButton();
   render();
 }
@@ -45,7 +49,10 @@ export function openLogin() {
     e.preventDefault();
     const code = d.querySelector('#code').value.trim().toUpperCase();
     const r = await post('whoami', {}, code).catch(err => ({ ok: false, error: err.message }));
-    if (!r.ok) { d.querySelector('#err').textContent = 'Codice non valido.'; return; }
+    if (!r.ok) {
+      d.querySelector('#err').textContent = r.error === 'codice non valido' ? 'Codice non valido.' : `Accesso non riuscito (${r.error || 'rete'}): riprova tra poco.`;
+      return;
+    }
     save(code);
     store.code = code;
     store.role = r.role;

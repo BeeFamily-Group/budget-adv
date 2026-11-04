@@ -6,6 +6,7 @@ var MESI = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Lugli
             'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
 var PROPOSAL_BG = '#fff2cc';
 var BIG_CHANGE = 0.5;
+var MAX_EUR_DAY = 1000;   // tetto per canale: il piano 2027 arriva a 150 €/g
 
 function monthsList() {
   var parts = LAYOUT.firstYm.split('-');
@@ -145,14 +146,42 @@ function ymOf(v) {
 }
 
 // CacheService di Apps Script accetta valori fino a 100 KB.
-function fitsCache(str) {
-  return String(str).length <= 100000;
-}
 
+function requestYm(r) { return String(r.ym || r.apply_from || '').slice(0, 7); }
+
+// Da applicare: in attesa, o programmate arrivate alla data. Mai una richiesta di un mese gia' finito.
 function dueRequests(requests, today) {
+  var ym = String(today).slice(0, 7);
   return (requests || []).filter(function (r) {
+    if (requestYm(r) < ym) return false;
     return r.status === 'pending' || (r.status === 'scheduled' && r.apply_from <= today);
   });
+}
+
+// Richieste ancora aperte di un mese gia' finito: vanno segnate come scadute.
+function expiredRequests(requests, today) {
+  var ym = String(today).slice(0, 7);
+  return (requests || []).filter(function (r) {
+    return (r.status === 'pending' || r.status === 'scheduled') && requestYm(r) < ym;
+  });
+}
+
+// Esito scritto dalla routine: una richiesta sostituita nel frattempo resta "superseded".
+function resultStatus(current, incoming) {
+  return current === 'superseded' ? 'superseded' : incoming;
+}
+
+// Lo stato supera i 100 KB di una voce di cache: si salva a pezzi.
+function chunkText(str, size) {
+  var out = [];
+  for (var i = 0; i < str.length; i += size) out.push(str.slice(i, i + size));
+  return out.length ? out : [''];
+}
+
+// Il bootstrap vale una volta sola: dopo resta chiuso anche se qualcuno svuota gli hash.
+function bootstrapClosed(props) {
+  props = props || {};
+  return Boolean(props.BOOTSTRAPPED || props.HASH_francesco || props.HASH_marco || props.HASH_ambra || props.HASH_routine);
 }
 
 // Controllo dei valori prima di scrivere nello Sheet: '' se va bene, altrimenti il motivo.
@@ -168,6 +197,7 @@ function validatePayload(action, b) {
     if (!YM_RE.test(String(b.ym))) return 'mese non valido';
     if (!given(b.eur) && !given(b.days) && !given(b.start_day)) return 'niente da salvare';
     if (given(b.eur) && !isAmount(b.eur)) return '€/giorno non valido';
+    if (given(b.eur) && Number(b.eur) > MAX_EUR_DAY) return 'oltre 1.000 €/g: se serve davvero, scrivilo direttamente nello Sheet';
     if (given(b.days) && !isIntIn(b.days, 0, 31)) return 'giorni non validi (da 0 a 31)';
     if (given(b.start_day) && !isIntIn(b.start_day, 1, 31)) return 'dal giorno non valido (da 1 a 31)';
   }
@@ -180,6 +210,7 @@ function validatePayload(action, b) {
   if (action === 'metaRequest') {
     if (!YM_RE.test(String(b.ym))) return 'mese non valido';
     if (!isAmount(b.eur) || Number(b.eur) <= 0) return 'per spegnere le campagne usa Gestione inserzioni: qui il €/giorno deve essere maggiore di 0';
+    if (Number(b.eur) > MAX_EUR_DAY) return 'oltre 1.000 €/g: se serve davvero, cambialo da Gestione inserzioni';
     if (!DATE_RE.test(String(b.apply_from))) return 'data di partenza mancante';
   }
   if (action === 'writeSpend') {
@@ -202,6 +233,7 @@ if (typeof module !== 'undefined') {
     LAYOUT: LAYOUT, monthsList: monthsList, monthLabel: monthLabel, colLetter: colLetter,
     findBlocks: findBlocks, readMonths: readMonths, channelId: channelId, planCell: planCell,
     roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote,
-    spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, titleMismatch: titleMismatch, dueRequests: dueRequests, ymOf: ymOf, fitsCache: fitsCache,
+    spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, titleMismatch: titleMismatch, dueRequests: dueRequests, expiredRequests: expiredRequests, resultStatus: resultStatus,
+    chunkText: chunkText, bootstrapClosed: bootstrapClosed, ymOf: ymOf,
   };
 }

@@ -87,10 +87,6 @@ test('mese normalizzato anche se Google lo ha trasformato in data', () => {
   assert.equal(L.ymOf(''), '');
 });
 
-test('lo stato va in cache solo se sta nel limite di Apps Script', () => {
-  assert.equal(L.fitsCache('x'.repeat(45000)), true);
-  assert.equal(L.fitsCache('x'.repeat(100001)), false);
-});
 
 test('richieste da applicare', () => {
   const reqs = [
@@ -129,4 +125,41 @@ test('il blocco si riconosce anche dal titolo: colonne spostate = nessuna scritt
   assert.equal(L.titleMismatch(block, ' estero  google ads ', 'Cristallo'), '');
   assert.match(L.titleMismatch(block, 'BUDGET GOOGLE ADS', 'Cristallo'), /Cristallo.*J.*ESTERO GOOGLE ADS.*Ricarica/);
   assert.match(L.titleMismatch(block, undefined, 'Cristallo'), /ricaricare/);
+});
+
+test('tetto di 1.000 €/g contro un codice rubato o un errore di battitura', () => {
+  assert.match(L.validatePayload('metaRequest', { ym: '2026-12', eur: 1500, apply_from: '2026-12-01' }), /1\.000/);
+  assert.match(L.validatePayload('savePlan', { ym: '2026-12', eur: 1001 }), /1\.000/);
+  assert.equal(L.validatePayload('savePlan', { ym: '2026-12', eur: 1000 }), '');
+});
+
+test('stato in cache a pezzi: oltre 100 KB la cache funziona ancora', () => {
+  const big = 'x'.repeat(250000);
+  const parts = L.chunkText(big, 90000);
+  assert.equal(parts.length, 3);
+  assert.equal(parts.join(''), big);
+  assert.deepEqual(L.chunkText('', 90000), ['']);
+});
+
+test('bootstrap chiuso per sempre dopo la prima volta, anche senza hash', () => {
+  assert.equal(L.bootstrapClosed({}), false);
+  assert.equal(L.bootstrapClosed({ BOOTSTRAPPED: '1' }), true);
+  assert.equal(L.bootstrapClosed({ HASH_marco: 'abc' }), true);
+});
+
+test('richiesta di un mese ormai finito: scaduta, mai applicata nel mese dopo', () => {
+  const reqs = [
+    { id: 'a', ym: '2026-10', status: 'pending', apply_from: '2026-10-31' },
+    { id: 'b', ym: '2026-11', status: 'pending', apply_from: '2026-11-04' },
+    { id: 'c', ym: '2026-12', status: 'scheduled', apply_from: '2026-12-01' },
+    { id: 'd', ym: '2026-10', status: 'scheduled', apply_from: '2026-10-20' },
+  ];
+  assert.deepEqual(L.dueRequests(reqs, '2026-11-01').map(r => r.id), ['b']);
+  assert.deepEqual(L.expiredRequests(reqs, '2026-11-01').map(r => r.id), ['a', 'd']);
+});
+
+test('esito di una richiesta sostituita durante la run: resta "sostituita"', () => {
+  assert.equal(L.resultStatus('pending', 'applied'), 'applied');
+  assert.equal(L.resultStatus('superseded', 'applied'), 'superseded');
+  assert.equal(L.resultStatus('superseded', 'error'), 'superseded');
 });
