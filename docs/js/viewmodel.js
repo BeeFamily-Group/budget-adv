@@ -25,7 +25,7 @@ export function stateLabel(state, pct) {
 }
 
 export const COLOR_CAVEAT ='Lead Color gonfiati: arrivano a coppie (doppio invio browser + server)';
-const RANK = { over: 3, early: 3, under: 2, ok: 1, nodata: 0, notyet: 0, none: 0 };
+const RANK = { over: 3, early: 3, under: 2, ok: 1, nodata: 0.6, notyet: 0.5, none: 0 };
 const round2 = (n) => Math.round(n * 100) / 100;
 
 // Una riga MAPPA vale per il canale se ha il suo id e, quando c'è, lo stesso titolo del blocco (righe vecchie senza titolo: valgono).

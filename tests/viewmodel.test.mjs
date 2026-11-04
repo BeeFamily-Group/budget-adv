@@ -254,3 +254,10 @@ test('etichette giuste: Google senza numeri, mese non iniziato, spesa prima dei 
   const early = buildCards(late, meta, '2026-11', '2026-11-14').find(c => c.tab === 'Ciccio').channels[0];
   assert.equal(stateLabel(early.state, early.pct), 'spesa prima dei giorni attivi');
 });
+
+test('scheda di un mese futuro: "non ancora iniziato", non "nessun budget"', () => {
+  const c = buildCards(state, meta, '2026-12', '2026-11-14').find(x => x.tab === 'Ciccio');
+  assert.equal(c.overall, 'notyet');
+  const g = buildCards({ ...state, google: [] }, meta, '2026-11', '2026-11-14').find(x => x.tab === 'Ciccio');
+  assert.equal(g.overall, 'under');   // un canale fuori ritmo resta più importante di "numeri da inserire"
+});
