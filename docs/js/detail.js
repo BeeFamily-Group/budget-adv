@@ -1,5 +1,5 @@
 // Dettaglio di una struttura: canali, risultati, piano mese per mese, chiusura, note.
-import { buildDetail, channelLabel, stateLabel, channelView, applyFrom } from './viewmodel.js';
+import { buildDetail, channelLabel, stateLabel, channelView, applyFrom, staleText } from './viewmodel.js';
 import { fmtEur, parseEur } from './calc.js';
 import { store, esc, ddmm, monthShort, kpiHtml, barHtml, reload } from './app.js';
 import { post } from './api.js';
@@ -88,7 +88,7 @@ function channelBox(c, d) {
   const yesterday = c.kind === 'meta' ? (c.daily.find(x => x.date === store.asOf) || { spend: 0 }).spend : null;
   const rows = [];
   if (c.kind === 'meta') {
-    rows.push(['Ieri', fmtEur(yesterday)]);
+    rows.push(['Ieri', c.dataStaleSince ? '— (dati fermi)' : fmtEur(yesterday)]);
     rows.push(['Impostato su Meta oggi', `${fmtEur(c.dailyBudget)}/g · ${c.activeCampaigns} ${c.activeCampaigns === 1 ? 'campagna attiva' : 'campagne attive'}`]);
   } else {
     rows.push(['Aggiornato', c.updatedOn ? `${ddmm(c.updatedOn)} da Marco` : 'mai']);
@@ -97,7 +97,7 @@ function channelBox(c, d) {
   }
   rows.push(['Piano €/giorno', `${fmtEur(c.eur || 0)} × ${c.days || 0} gg`]);
   if (c.perDay !== null && c.programmed > 0) rows.push(['Per chiudere il mese servono', `${fmtEur(c.perDay)}/g`]);
-  if (c.dataStaleSince) rows.push(['Dati Meta', `fermi al ${ddmm(c.dataStaleSince)}`]);
+  if (c.dataStaleSince) rows.push(['Dati Meta', staleText(c.dataStaleSince)]);
 
   let alert = '';
   if (c.alert) {
@@ -108,7 +108,7 @@ function channelBox(c, d) {
         <button class="btn" data-act="lowerPlan" data-id="${esc(c.id)}" data-eur="${c.alert.y}">Abbassa il piano a ${fmtEur(c.alert.y)}/g</button>` : ''}</div>`;
   }
   let googleForm = '';
-  if (c.kind === 'google' && d.can.editGoogle && d.ym === store.asOf.slice(0, 7)) {
+  if (c.kind === 'google' && d.can.editGoogle && d.ym === todayRome().slice(0, 7)) {
     googleForm = `<form class="form" data-act="google" data-id="${esc(c.id)}">
         <label>Speso del mese a oggi (€)<input name="spent_mtd" inputmode="decimal" required value="${c.updatedOn ? c.spent : ''}"></label>
         <label>Lead del mese<input name="leads_mtd" inputmode="numeric" value="${c.leadsMtd ?? ''}"></label>
@@ -193,7 +193,7 @@ function notesBox(d) {
 }
 
 function paint() {
-  const d = buildDetail(store.state, store.meta, currentTab, store.ym, store.asOf, store.role);
+  const d = buildDetail(store.state, store.meta, currentTab, store.ym, store.asOf, store.role, todayRome());
   const ro = store.role === 'ambra' ? '<span class="ro">Sola lettura · Ambra</span>' : '';
   $d().innerHTML = `<div class="detail-head"><button class="back" type="button" data-act="back">← Indietro</button>
       <h2>${esc(currentTab)} · ${monthShort(store.ym)}</h2>${ro}</div>
@@ -252,7 +252,7 @@ async function onClick(e) {
       }
     }
     if (b.dataset.act === 'days') {
-      const dd = buildDetail(store.state, store.meta, currentTab, store.ym, store.asOf, store.role);
+      const dd = buildDetail(store.state, store.meta, currentTab, store.ym, store.asOf, store.role, todayRome());
       const c = dd.plan.find(p => p.ym === b.dataset.ym).channels.find(x => x.id === b.dataset.id);
       const change = await daysDialog(c, b.dataset.ym);
       if (change || (change === null && c.requestStale && daysDialog.saved)) {

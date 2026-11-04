@@ -1,6 +1,6 @@
 // Schermata principale: mesi, schede per struttura, campagne da assegnare.
 import { getState, getMeta, isDemo } from './api.js';
-import { buildCards, unassigned, channelLabel, stateLabel, staleAccounts } from './viewmodel.js';
+import { buildCards, unassigned, channelLabel, stateLabel, staleAccounts, staleText, macLate } from './viewmodel.js';
 import { fmtEur } from './calc.js';
 import { SHEET_LABEL } from '../config.js';
 
@@ -38,9 +38,11 @@ export function barHtml(c) {
 function channelHtml(c) {
   let right = '';
   if (c.kind === 'meta') right = c.perDay !== null && c.programmed > 0 ? `serve ${fmtEur(c.perDay)}/g` : '';
-  else right = c.updatedOn ? `Marco ${ddmm(c.updatedOn)}` : 'Marco: da inserire';
+  else right = c.updatedOn
+    ? `${c.perDay !== null && c.programmed > 0 ? `serve ${fmtEur(c.perDay)}/g · ` : ''}Marco ${ddmm(c.updatedOn)}`
+    : 'Marco: da inserire';
   const flags = [];
-  if (c.dataStaleSince) flags.push(`dati fermi al ${ddmm(c.dataStaleSince)}`);
+  if (c.dataStaleSince) flags.push(`dati Meta ${staleText(c.dataStaleSince)}`);
   if (c.kind === 'google' && c.stale && c.programmed > 0) flags.push('Google non aggiornato da più di 7 giorni');
   return `<div>
       <div class="ch-row"><span>${esc(channelLabel(c.title))} <b>${fmtEur(c.spent)}</b> / ${fmtEur(c.programmed)}</span><span>${esc(right)}</span></div>
@@ -67,14 +69,18 @@ export function render() {
   $('freshness').textContent = `Meta aggiornato al ${ddmm(asOf)} · Google inserito da Marco${isDemo() ? ' · DATI DI PROVA' : (SHEET_LABEL ? ` · ${SHEET_LABEL}` : '')}`;
 
   const stale = staleAccounts(state, meta);
+  const late = macLate(meta.as_of, store.today);
+  const mac = late === null || late > 0
+    ? `<div class="banner"><b>Dati Meta ${meta.as_of ? `fermi al ${ddmm(meta.as_of)}` : 'non ancora arrivati'}</b>: la routine notturna non è partita, di solito perché il Mac di Francesco era spento. Si aggiorna da sola alla prima notte con il Mac acceso; le modifiche Meta restano in attesa.</div>`
+    : '';
   const skipped = state.skipped_tabs || [];
-  $('banners').innerHTML = (stale.length
-    ? `<div class="banner">Dati Meta fermi per ${stale.map(a => `<b>${esc(a.name)}</b> (ultimo dato ${ddmm(a.last_ok)})`).join(', ')}.</div>`
+  $('banners').innerHTML = mac + (stale.length
+    ? `<div class="banner">Dati Meta ${stale.map(a => `<b>${esc(a.name)}</b> (${a.last_ok ? `ultimo dato ${ddmm(a.last_ok)}` : 'mai letti'})`).join(', ')}: la dashboard tiene l'ultimo dato buono.</div>`
     : '') + (skipped.length
     ? `<div class="banner">Nello Sheet non trovo i blocchi budget di ${skipped.map(t => `<b>${esc(t)}</b>`).join(', ')}: la riga dei titoli (riga 13) è stata spostata? Finché non si sistema, queste strutture non compaiono qui.</div>`
     : '');
 
-  const cards = buildCards(state, meta, ym, asOf);
+  const cards = buildCards(state, meta, ym, asOf, store.today);
   const off = cards.filter(c => c.overall === 'under' || c.overall === 'over');
   const shown = store.onlyOff ? off : cards;
   $('count').textContent = `${cards.length} strutture · ${off.length} fuori ritmo`;
@@ -102,6 +108,7 @@ export async function reload() {
   const [state, meta] = await Promise.all([getState(), getMeta()]);
   store.state = state;
   store.meta = meta;
+  store.today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
   store.asOf = meta.as_of || new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   store.ym = store.ym || store.asOf.slice(0, 7);
   render();

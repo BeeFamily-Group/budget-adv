@@ -66,8 +66,22 @@ function latestGoogle(google, channelId, ym) {
 function staleSince(meta, mapping, ch) {
   const ids = mappedIds(mapping, ch);
   const accs = new Set(meta.campaigns.filter(c => ids.has(String(c.id))).map(c => c.account_id));
-  const dates = [...accs].map(a => meta.accounts[a]).filter(a => a && !a.ok).map(a => a.last_ok || '');
-  return dates.length ? dates.sort()[0] : null;
+  const dates = [...accs].map(a => meta.accounts[a]).filter(a => a && !a.ok).map(a => a.last_ok || 'mai');
+  if (!dates.length) return null;
+  return dates.includes('mai') ? 'mai' : dates.sort()[0];
+}
+
+// Testo per un canale o un account con i dati Meta fermi: 'mai' (o null) = mai letto.
+export function staleText(since) {
+  return !since || since === 'mai' ? 'mai letti' : `fermi al ${ddmm(since)}`;
+}
+
+// Mac spento: di quanti giorni i dati Meta sono indietro rispetto a ieri (0 = in orario, null = nessun dato).
+export function macLate(asOf, today) {
+  if (!asOf) return null;
+  const day = 86400000;
+  const late = Math.round((Date.parse(today) - day - Date.parse(asOf)) / day);
+  return late > 0 ? late : 0;
 }
 
 function withOverrides(state, ch) {
@@ -77,7 +91,7 @@ function withOverrides(state, ch) {
   });
 }
 
-export function channelView(state, meta, ch, ym, asOf) {
+export function channelView(state, meta, ch, ym, asOf, today = asOf) {
   const months = withOverrides(state, ch);
   const i = months.findIndex(m => m.ym === ym);
   if (i === -1) return null;
@@ -98,7 +112,7 @@ export function channelView(state, meta, ch, ym, asOf) {
     spentAsOf = g ? String(g.date) : null;
     extra = { dailyBudget: g ? Number(g.daily_budget) : null, activeCampaigns: g ? (g.active ? 1 : 0) : null,
               leadsMtd: g ? Number(g.leads_mtd) : null, daily: [], updatedOn: g ? String(g.date) : null,
-              stale: googleStale(g && String(g.date), asOf), dataStaleSince: null };
+              stale: googleStale(g && String(g.date), today), dataStaleSince: null };
   }
   const elapsed = spentAsOf ? elapsedActiveDays(win, ym, spentAsOf) : 0;
   const expected = expectedToDate(programmed, elapsed, win.days);
@@ -111,9 +125,9 @@ export function channelView(state, meta, ch, ym, asOf) {
   };
 }
 
-export function buildCards(state, meta, ym, asOf) {
+export function buildCards(state, meta, ym, asOf, today = asOf) {
   return state.structures.map(s => {
-    const channels = s.channels.map(ch => channelView(state, meta, ch, ym, asOf)).filter(Boolean);
+    const channels = s.channels.map(ch => channelView(state, meta, ch, ym, asOf, today)).filter(Boolean);
     // I 7 giorni guardano anche a fine mese precedente: si usa il giornaliero completo, non solo il mese scelto.
     const allDaily = new Map();
     for (const ch of s.channels.filter(c => c.kind === 'meta')) {
@@ -190,11 +204,11 @@ function prevMonth(ym) {
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
-export function buildDetail(state, meta, tab, ym, asOf, role) {
+export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
   const s = state.structures.find(x => x.tab === tab);
   const currentYm = asOf.slice(0, 7);
   const channels = s.channels.map(ch => {
-    const v = channelView(state, meta, ch, ym, asOf);
+    const v = channelView(state, meta, ch, ym, asOf, today);
     let alert = null;
     if (v && meta.as_of && ch.kind === 'meta' && ym === currentYm && v.programmed > 0 && v.remaining > 0 && v.eur > 0
         && Math.abs(v.dailyBudget - v.eur) / v.eur > 0.10) {
@@ -255,13 +269,15 @@ export function buildDetail(state, meta, tab, ym, asOf, role) {
 
   return {
     tab, ym, channels, plan, closing, notes,
-    results: { month: { meta: metaM, google: googleM, total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf)[0].kpi7 },
+    results: { month: { meta: metaM, google: googleM, total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf, today)[0].kpi7 },
     can: { editMeta: role === 'francesco', editGoogle: role === 'marco', note: Boolean(role) },
   };
 }
 
 // Account Meta non letti, solo se hanno campagne collegate a una scheda (es. Sardinia ha solo Google: niente avviso).
 export function staleAccounts(state, meta) {
+  // l'account e' collegato a una scheda dal roster (meta.accounts[id].tab); senza roster, dalla MAPPA
+  const metaTabs = new Set(state.structures.filter(s => s.channels.some(c => c.kind === 'meta')).map(s => s.tab));
   const tabOf = new Map();
   for (const r of state.mapping) {
     if (!r.channel_id) continue;
@@ -269,7 +285,14 @@ export function staleAccounts(state, meta) {
     const acc = c ? c.account_id : String(r.account_id);
     if (!tabOf.has(acc)) tabOf.set(acc, r.channel_id.split('|')[0]);
   }
+  const nameOf = (id, a) => {
+    if (a.tab === 'COLOR') return [...metaTabs].some(t => t.startsWith('Color ')) ? 'Color Holiday' : null;
+    if (a.tab) return metaTabs.has(a.tab) ? a.tab : null;
+    return tabOf.get(id) || null;
+  };
   return Object.entries(meta.accounts || {})
-    .filter(([id, a]) => !a.ok && tabOf.has(id))
-    .map(([id, a]) => ({ account_id: id, name: tabOf.get(id), last_ok: a.last_ok }));
+    .filter(([, a]) => !a.ok)
+    .map(([id, a]) => ({ account_id: id, name: nameOf(id, a), last_ok: a.last_ok }))
+    .filter(x => x.name)
+    .sort((x, y) => x.name.localeCompare(y.name));
 }

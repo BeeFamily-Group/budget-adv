@@ -135,6 +135,13 @@ def auto_mapping(campaigns, accounts, existing, meta_channels, spend_ids, titles
     return rows
 
 
+def label_accounts(merged, accounts):
+    """Ogni account dice a quale struttura appartiene (dal roster): serve all'avviso "dati fermi" della pagina."""
+    for acc, info in merged["accounts"].items():
+        info["tab"] = accounts.get(str(acc), "")
+    return merged
+
+
 def title_backfill(existing, titles):
     """Righe MAPPA gia' assegnate ma senza titolo del blocco: ricevono il titolo di oggi (una volta sola)."""
     return [{"account_id": str(r["account_id"]), "campaign_id": str(r["campaign_id"]), "campaign_name": r.get("campaign_name", ""),
@@ -156,10 +163,11 @@ def main(argv=None):
     state = json.load(open(a.state))
     meta_channels = {s["tab"]: [ch["id"].split("|")[1] for ch in s["channels"] if ch["kind"] == "meta"]
                      for s in state["structures"]}
-    merged = merge_with_previous(normalize(a.raw), prev, a.as_of)
+    roster = accounts_mod.load_accounts(a.roster)
+    merged = label_accounts(merge_with_previous(normalize(a.raw), prev, a.as_of), roster)
     spend_ids = {r["campaign_id"] for r in merged["daily"] if r["spend"] > 0}
     titles = {ch["id"]: ch["title"] for s in state["structures"] for ch in s["channels"] if ch["kind"] == "meta"}
-    rows = auto_mapping(merged["campaigns"], accounts_mod.load_accounts(a.roster), state.get("mapping", []),
+    rows = auto_mapping(merged["campaigns"], roster, state.get("mapping", []),
                         meta_channels, spend_ids, titles)
     backfill = title_backfill(state.get("mapping", []), titles)
     os.makedirs(os.path.dirname(a.out), exist_ok=True)

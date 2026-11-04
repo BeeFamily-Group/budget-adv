@@ -147,6 +147,17 @@ class Normalize(unittest.TestCase):
         self.assertEqual(merged["as_of"], "2026-11-14")
 
 
+class AccountTabs(unittest.TestCase):
+    def test_each_account_names_its_structure(self):
+        merged = {"accounts": {"421004342260012": {"ok": True, "error": None, "last_ok": "2026-11-14"},
+                               "608324351982441": {"ok": False, "error": "x", "last_ok": None},
+                               "999": {"ok": True, "error": None, "last_ok": "2026-11-14"}}}
+        build_meta.label_accounts(merged, ACCOUNTS)
+        self.assertEqual(merged["accounts"]["421004342260012"]["tab"], "Ciccio")
+        self.assertEqual(merged["accounts"]["608324351982441"]["tab"], "Sardinia")
+        self.assertEqual(merged["accounts"]["999"]["tab"], "")
+
+
 class Accounts(unittest.TestCase):
     def test_roster_aliases(self):
         with tempfile.TemporaryDirectory() as d:

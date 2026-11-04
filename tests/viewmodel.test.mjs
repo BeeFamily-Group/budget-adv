@@ -199,3 +199,35 @@ test('richiesta scaduta: il mese è finito prima di applicarla', () => {
   const oct = d.plan.find(p => p.ym === '2026-10').channels.find(c => c.kind === 'meta');
   assert.equal(oct.requestStatus, 'scaduta: il mese è finito prima di applicarla');
 });
+
+import { staleText, macLate } from '../docs/js/viewmodel.js';
+
+test('account collegato dal roster: avviso anche senza campagne nella mappa, "mai letti" se non è mai riuscito', () => {
+  const m2 = { ...meta, accounts: {
+    ...meta.accounts,
+    '433491253104777': { ok: false, error: 'x', last_ok: null, tab: 'B612' },
+    '1576344015714351': { ok: false, error: 'x', last_ok: '2026-11-12', tab: 'COLOR' },
+    '608324351982441': { ok: false, error: 'not enabled', last_ok: null, tab: 'Sardinia' },
+  } };
+  const st = { ...state, mapping: [] };
+  assert.deepEqual(staleAccounts(st, m2), [
+    { account_id: '433491253104777', name: 'B612', last_ok: null },
+    { account_id: '1576344015714351', name: 'Color Holiday', last_ok: '2026-11-12' },
+  ]);
+  assert.equal(staleText(null), 'mai letti');
+  assert.equal(staleText('2026-11-12'), 'fermi al 12/11');
+  const card = buildCards(state, m2, '2026-11', '2026-11-14').find(c => c.tab === 'B612');
+  assert.equal(card.channels[0].dataStaleSince, 'mai');
+});
+
+test('Mac spento: giorni di ritardo dei dati Meta rispetto a ieri', () => {
+  assert.equal(macLate('2026-11-13', '2026-11-14'), 0);
+  assert.equal(macLate('2026-11-10', '2026-11-14'), 3);
+  assert.equal(macLate(null, '2026-11-14'), null);
+});
+
+test('Google fermo si misura da oggi, non dalla data dei dati Meta', () => {
+  const card = (today) => buildCards(state, meta, '2026-11', '2026-11-14', today).find(c => c.tab === 'Ciccio');
+  assert.equal(card('2026-11-15').channels[1].stale, false);
+  assert.equal(card('2026-11-25').channels[1].stale, true);
+});
