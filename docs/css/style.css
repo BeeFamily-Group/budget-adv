@@ -1,4 +1,4 @@
-/* Budget ADV BeeFamily — spunto dal sito consulenzaperhotel.it: barre blu notte con il logo, accento giallo,
+/* Rhythm (budget ADV BeeFamily) — spunto dal sito consulenzaperhotel.it: barre blu notte con il logo, accento giallo,
    titoli Outfit; i contenuti restano su fondo chiaro per leggere bene tabelle e numeri. Testo Inter. */
 :root {
   --bg: #f2f5f8;
@@ -54,7 +54,8 @@ table, .num, .kpi .v, .ch-num, .tiles .v { font-variant-numeric: tabular-nums; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand img { display: block; height: 28px; width: auto; }
 .brand-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, .2); }
-.brand-name { font: 600 15px/1 var(--display); color: #fff; letter-spacing: -0.005em; }
+.brand-name { font: 700 16px/1 var(--display); color: #fff; letter-spacing: -0.01em; }
+.brand-name small { margin-left: 6px; font: 500 12px/1 var(--sans); color: var(--night-muted); letter-spacing: 0; }
 .top-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .fresh { font-size: 12px; color: var(--night-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .who { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--yel); background: var(--yel); color: var(--night); border-radius: 999px;
