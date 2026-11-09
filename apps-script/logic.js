@@ -75,6 +75,18 @@ function readMonths(grid, bg, col) {
   });
 }
 
+// Confronto con l'anno prima (righe 9-11 del tab, sopra il blocco che inizia alla colonna col, 1-based):
+// riga 9 l'anno, riga 10 "Programmato", riga 11 "Investito". Se le etichette non tornano: null.
+function readPrevYear(grid, col) {
+  var r9 = grid[8] || [];
+  var r10 = grid[9] || [];
+  var r11 = grid[10] || [];
+  var year = num(r9[col]);
+  if (!year || String(r10[col - 1] || '').trim().toLowerCase() !== 'programmato'
+      || String(r11[col - 1] || '').trim().toLowerCase() !== 'investito') return null;
+  return { year: year, programmed: num(r10[col]), spent: num(r11[col]) };
+}
+
 function channelId(tab, letter) {
   return tab + '|' + letter;
 }
@@ -232,7 +244,7 @@ function titleMismatch(block, sent, tab) {
 if (typeof module !== 'undefined') {
   module.exports = {
     LAYOUT: LAYOUT, monthsList: monthsList, monthLabel: monthLabel, colLetter: colLetter,
-    findBlocks: findBlocks, readMonths: readMonths, channelId: channelId, planCell: planCell,
+    findBlocks: findBlocks, readMonths: readMonths, readPrevYear: readPrevYear, channelId: channelId, planCell: planCell,
     roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote,
     spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, titleMismatch: titleMismatch, dueRequests: dueRequests, expiredRequests: expiredRequests, resultStatus: resultStatus,
     chunkText: chunkText, bootstrapClosed: bootstrapClosed, ymOf: ymOf,

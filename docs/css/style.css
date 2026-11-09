@@ -215,7 +215,11 @@ table.t tbody tr:hover td { background: #fbfaf7; }
 .month-nav span { min-width: 64px; text-align: center; font-size: 13px; font-weight: 600; }
 .ro { display: inline-flex; align-items: center; gap: 5px; background: var(--navy-soft); color: var(--navy); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; }
 .detail-body { max-width: 1080px; margin: 0 auto; padding: 24px 24px 72px; }
+.dh { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .dh h1 { margin: 0; font-size: 30px; font-weight: 700; }
+.total-box { margin-top: 0; }
+.bar i.total { background: var(--navy); }
+.grid2.after-total { margin-top: 16px; }
 .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0 16px; }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
 .tile .l { font-size: 12px; color: var(--muted); font-weight: 500; }
@@ -264,6 +268,17 @@ table.plan tr.cur td:first-child { background: #f7f5ef; }
 .days-txt { display: block; margin-top: 3px; text-align: right; color: var(--muted); font-size: 12px; }
 table.plan th.status-h { text-align: left; }
 td.status { font-size: 12px; color: var(--muted); white-space: normal; min-width: 140px; max-width: 220px; text-align: left !important; }
+/* Note del mese: riga sotto il mese, a tutta larghezza; il testo resta fermo a sinistra mentre la tabella scorre */
+table.plan tr.has-notes td { border-bottom-color: transparent; }
+table.plan tr.note-row td { position: static; padding-top: 0; text-align: left; white-space: normal; }
+.pnotes-in { position: sticky; left: 0; max-width: min(720px, calc(100vw - 72px)); display: grid; gap: 4px; padding: 8px 10px; border-left: 3px solid var(--c-cpl);
+  background: var(--surface-2); border-radius: 0 6px 6px 0; }
+.pnote { font-size: 12px; line-height: 1.45; color: var(--ink-2); }
+.pnote time { color: var(--muted); margin-right: 2px; }
+.mname { display: inline-block; min-width: 46px; }
+.note-add { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px; border: 1px dashed var(--line-2); border-radius: 6px; background: none;
+  color: var(--muted); font-size: 11px; font-weight: 500; min-height: 24px; }
+.note-add:hover { color: var(--ink); border-color: var(--ink-2); border-style: solid; }
 .legend-row { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
 .legend-row span { display: inline-flex; align-items: center; gap: 6px; }
 

@@ -319,3 +319,84 @@ test('ricerca: senza accenti e maiuscole, parole in qualsiasi ordine', () => {
   assert.equal(matchQuery('Ciccio', 'perla'), false);
   assert.equal(matchQuery('Ciccio', '  '), true);
 });
+
+// ---- Novità della call con Ambra del 09/11/2026 ----
+import { planTotals, prevYearTotals, buildReport } from '../docs/js/viewmodel.js';
+
+test('totale del piano: programmato e speso a oggi per canale e in tutto', () => {
+  const d = buildDetail(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', null, '2026-11-14');
+  const t = planTotals(d.plan);
+  assert.equal(t.from, '2026-10');
+  assert.equal(t.to, '2027-12');
+  assert.deepEqual(t.channels.map(c => [c.kind, c.programmed, c.spent]), [['meta', 7320, 1140], ['google', 6120, 2430]]);
+  assert.deepEqual(t.total, { programmed: 13440, spent: 3570, remaining: 9870, pct: 27 });
+  assert.deepEqual(d.totals, t);
+});
+
+test('totale del piano fino a un mese: speso solo dei mesi fino a quello compreso', () => {
+  const d = buildDetail(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', null, '2026-11-14');
+  assert.equal(planTotals(d.plan, '2026-10').total.spent, 1380);
+});
+
+test('note accanto a ogni mese del piano', () => {
+  const d = buildDetail(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', null, '2026-11-14');
+  assert.deepEqual(d.plan.find(p => p.ym === '2026-11').notes.map(n => n.author), ['ambra']);
+  assert.deepEqual(d.plan.find(p => p.ym === '2026-10').notes.map(n => n.author), ['marco']);
+  assert.equal(d.plan.find(p => p.ym === '2026-12').notes.length, 0);
+});
+
+const withPrev = {
+  ...withReq,
+  structures: withReq.structures.map(s => (s.tab !== 'Ciccio' ? s : {
+    ...s,
+    channels: s.channels.map(c => ({ ...c, prev: c.kind === 'meta'
+      ? { year: 2026, programmed: 40530, spent: 33453.75 } : { year: 2026, programmed: 36110, spent: 26095.66 } })),
+  })),
+};
+
+test('anno precedente: totali per canale dallo Sheet', () => {
+  const p = prevYearTotals(withPrev.structures.find(s => s.tab === 'Ciccio'));
+  assert.equal(p.year, 2026);
+  assert.deepEqual(p.channels.map(c => [c.kind, c.programmed, c.spent]), [['meta', 40530, 33453.75], ['google', 36110, 26095.66]]);
+  assert.deepEqual(p.total, { programmed: 76640, spent: 59549.41, pct: 78 });
+  assert.equal(buildDetail(withPrev, meta, 'Ciccio', '2026-11', '2026-11-14', null, '2026-11-14').prev.total.spent, 59549.41);
+});
+
+test('anno precedente assente: niente riquadro', () => {
+  assert.equal(prevYearTotals(withReq.structures.find(s => s.tab === 'Ciccio')), null);
+  const zero = { tab: 'X', channels: [{ id: 'X|A', kind: 'meta', title: 'BUDGET FACEBOOK ADS', prev: { year: 2026, programmed: 0, spent: 0 } }] };
+  assert.equal(prevYearTotals(zero), null);
+});
+
+test('report di un mese chiuso: speso, mese dopo e avanzamento sul totale', () => {
+  const r = buildReport(withReq, meta, 'Ciccio', '2026-10', '2026-11-14', '2026-11-14');
+  assert.deepEqual(r.month, { ym: '2026-10', programmed: 1240, spent: 1380, inProgress: false });
+  assert.deepEqual(r.next, { ym: '2026-11', programmed: 6000, perDay: 200, days: 30,
+                             channels: [{ kind: 'meta', title: 'BUDGET FACEBOOK ADS', eur: 120, days: 30, programmed: 3600 },
+                                        { kind: 'google', title: 'BUDGET GOOGLE ADS', eur: 80, days: 30, programmed: 2400 }] });
+  assert.deepEqual(r.total, { programmed: 13440, spent: 1380, remaining: 12060, pct: 10 });
+  assert.deepEqual([r.from, r.to], ['2026-10', '2027-12']);
+});
+
+test('report del mese in corso: speso a oggi', () => {
+  const r = buildReport(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', '2026-11-14');
+  assert.deepEqual(r.month, { ym: '2026-11', programmed: 6000, spent: 2190, inProgress: true });
+  assert.equal(r.next.programmed, 3720 + 2480);
+  assert.equal(r.next.perDay, 200);
+  assert.equal(r.total.spent, 3570);
+});
+
+test('report: canali con giorni diversi nel mese dopo, niente €/giorno unico', () => {
+  const st = { ...withReq, days: [{ channel_id: 'Ciccio|J', ym: '2026-12', start_day: 1 }],
+    structures: withReq.structures.map(s => (s.tab !== 'Ciccio' ? s : { ...s, channels: s.channels.map(c => (c.kind !== 'google' ? c
+      : { ...c, months: c.months.map(m => (m.ym === '2026-12' ? { ...m, days: 15 } : m)) })) })) };
+  const r = buildReport(st, meta, 'Ciccio', '2026-11', '2026-11-14', '2026-11-14');
+  assert.equal(r.next.perDay, null);
+  assert.equal(r.next.days, null);
+  assert.deepEqual(r.next.channels.map(c => [c.eur, c.days]), [[120, 31], [80, 15]]);
+  assert.equal(r.next.programmed, 3720 + 1200);
+});
+
+test('report dell\'ultimo mese del piano: nessun mese dopo', () => {
+  assert.equal(buildReport(withReq, meta, 'Ciccio', '2027-12', '2026-11-14', '2026-11-14').next, null);
+});

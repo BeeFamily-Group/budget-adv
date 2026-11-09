@@ -87,7 +87,8 @@ function buildState() {
     return {
       tab: sh.getName(),
       channels: findBlocks(g.values).map(function (b) {
-        return { id: channelId(sh.getName(), b.letter), kind: b.kind, title: b.title, months: readMonths(g.values, g.bg, b.col) };
+        return { id: channelId(sh.getName(), b.letter), kind: b.kind, title: b.title, months: readMonths(g.values, g.bg, b.col),
+                 prev: readPrevYear(g.values, b.col) };
       }),
     };
   }).filter(function (s) {

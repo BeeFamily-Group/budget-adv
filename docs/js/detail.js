@@ -1,5 +1,5 @@
 // Dettaglio di una struttura: canali, risultati, piano mese per mese, chiusura, note.
-import { buildDetail, channelLabel, stateLabel, channelView, applyFrom, staleText, trendDaily } from './viewmodel.js';
+import { buildDetail, buildReport, channelLabel, stateLabel, channelView, applyFrom, staleText, trendDaily } from './viewmodel.js';
 import { fmtEur, parseEur } from './calc.js';
 import { store, esc, ddmm, monthShort, monthLong, kpiHtml, barHtml, reload, render as renderHome } from './app.js';
 import { post } from './api.js';
@@ -131,6 +131,73 @@ function tilesHtml(d) {
     </div>`;
 }
 
+// Budget complessivo: tutto il piano dello Sheet (ott 2026 – dic 2027), programmato e speso finora.
+function totalBox(d) {
+  const t = d.totals;
+  if (!t || !(t.total.programmed > 0 || t.total.spent > 0)) return '';
+  const fill = t.total.programmed > 0 ? Math.min(t.total.spent / t.total.programmed, 1) * 100 : 0;
+  const rows = t.channels.filter(c => c.programmed > 0 || c.spent > 0).map(c => {
+    const pct = c.programmed > 0 ? ` · ${Math.round((c.spent / c.programmed) * 100)}%` : '';
+    return `<div class="kv"><span><span class="plat ${c.kind}"><i></i>${esc(channelLabel(c.title))}</span></span><b>${fmtEur(c.spent)} di ${fmtEur(c.programmed)}${pct}</b></div>`;
+  }).join('');
+  return `<div class="box total-box">
+      <div class="box-head"><div><h2>Budget complessivo</h2><p class="small">Da ${monthLong(t.from)} a ${monthLong(t.to)} · speso finora sul programmato di tutto il piano</p></div>
+        ${t.total.pct === null ? '' : `<span class="chip muted">${t.total.pct}% speso</span>`}</div>
+      <div class="big">${fmtEur(t.total.spent)} <small>di ${fmtEur(t.total.programmed)} programmati · restano ${fmtEur(t.total.remaining)}</small></div>
+      <div class="bar" aria-hidden="true"><i class="total" style="width:${fill.toFixed(1)}%"></i></div>
+      <div class="kvs">${rows}</div>
+    </div>`;
+}
+
+// Anno precedente: totali del blocco 2026 del vecchio foglio (righe 9-11 del tab), per canale.
+function prevBox(d) {
+  const p = d.prev;
+  if (!p) return '';
+  const pct = (c) => (c.programmed > 0 ? `${Math.round((c.spent / c.programmed) * 100)}%` : '—');
+  const rows = p.channels.map(c => `<tr><td><span class="plat ${c.kind}"><i></i>${esc(channelLabel(c.title))}</span></td>
+      <td>${fmtEur(c.programmed)}</td><td>${fmtEur(c.spent)}</td><td>${pct(c)}</td></tr>`).join('');
+  return `<div class="box prev-box"><div class="box-head"><div><h2>Anno precedente · ${p.year}</h2>
+      <p class="small">Totali del blocco ${p.year} del vecchio foglio budget (di solito da novembre ${p.year - 1} a dicembre ${p.year}).</p></div></div>
+      <div class="scroll-x"><table class="t"><thead><tr><th>Canale</th><th>Programmato</th><th>Investito</th><th>Investito sul programmato</th></tr></thead><tbody>
+        ${rows}
+        ${p.channels.length > 1 ? `<tr><td><b>Totale</b></td><td><b>${fmtEur(p.total.programmed)}</b></td><td><b>${fmtEur(p.total.spent)}</b></td><td><b>${pct(p.total)}</b></td></tr>` : ''}
+      </tbody></table></div></div>`;
+}
+
+const AUTHOR_SHORT = { francesco: 'Francesco', marco: 'Marco', ambra: 'Ambra' };
+
+// Note del mese sotto la sua riga del piano, a tutta larghezza: chi, quando e testo.
+function planNotesRow(p, cols, rowCls) {
+  if (!p.notes.length) return '';
+  const items = p.notes.map(n => `<div class="pnote"><b>${esc(AUTHOR_SHORT[n.author] || n.author)}</b> <time>${ddmm(String(n.ts).slice(0, 10))}</time> ${esc(n.text)}</div>`).join('');
+  return `<tr class="note-row ${rowCls}"><td colspan="${cols}"><div class="pnotes-in">${items}</div></td></tr>`;
+}
+
+// "+ Nota" accanto al mese, per chi ha fatto l'accesso (Francesco, Marco, Ambra).
+function noteAddBtn(ym) {
+  return store.role && AUTHOR_SHORT[store.role]
+    ? `<button class="note-add" type="button" data-act="noteFor" data-ym="${ym}" aria-label="Aggiungi una nota a ${monthShort(ym)}">${icon('plus', 12)}Nota</button>` : '';
+}
+
+function noteDialog(ym) {
+  return new Promise((resolve) => {
+    const d = document.getElementById('dialog');
+    d.innerHTML = `<form class="dialog-card" id="noteForm"><h3>Nota · ${esc(currentTab)} · ${monthShort(ym)}</h3>
+        <p class="small">Per esempio un cambio di budget in corso di mese. La leggono tutti; la firma è quella del tuo codice.</p>
+        <textarea id="noteText" maxlength="2000" required></textarea>
+        <button class="btn primary" type="submit">Salva nota</button> <button class="btn" type="button" id="no">Annulla</button></form>`;
+    d.hidden = false;
+    d.querySelector('#noteText').focus();
+    const done = (v) => { d.hidden = true; d.innerHTML = ''; resolve(v); };
+    d.querySelector('#no').addEventListener('click', () => done(null));
+    d.querySelector('#noteForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = d.querySelector('#noteText').value.trim();
+      done(text || null);
+    });
+  });
+}
+
 function resultsBox(d) {
   const m = d.results.month;
   const cpl = (sp, l) => (l > 0 ? eur2(sp / l) : '—');
@@ -174,7 +241,8 @@ function planBox(d) {
       return `<td${k ? ' class="sep"' : ''}>${input}${days}</td><td>${c.programmed ? fmtEur(c.programmed) : '<span class="dash">—</span>'}</td><td>${spent}</td>`;
     }).join('');
     const status = p.channels.map(c => c.requestStatus).filter(Boolean).join(' · ');
-    return `<tr class="${rowCls}"><td>${monthShort(p.ym)}</td>${cells}<td class="status">${esc(status)}</td></tr>`;
+    return `<tr class="${rowCls}${p.notes.length ? ' has-notes' : ''}"><td><span class="mname">${monthShort(p.ym)}</span>${noteAddBtn(p.ym)}</td>${cells}<td class="status">${esc(status)}</td></tr>`
+      + planNotesRow(p, 2 + p.channels.length * 3, rowCls);
   }).join('');
   const how = d.can.editMeta || d.can.editGoogle
     ? `Modifica il €/giorno e premi Invio, oppure tocca i giorni: va nello Sheet${d.can.editMeta ? ' e, per Meta, anche sulle campagne (mese in corso al prossimo giro orario, mesi futuri dal primo giorno attivo)' : ''}.`
@@ -237,11 +305,13 @@ function paint() {
         <button type="button" data-act="nextMonth" aria-label="Mese dopo"${i >= list.length - 1 ? ' disabled' : ''}>${icon('chevronRight', 16)}</button></div>
       ${ro}</div>
     <div class="detail-body">
-      <header class="dh"><h1>${esc(currentTab)}</h1><p class="sub">${monthLong(store.ym)} · Meta aggiornato al ${ddmm(store.asOf)} · Google da Marco</p></header>
+      <header class="dh"><div><h1>${esc(currentTab)}</h1><p class="sub">${monthLong(store.ym)} · Meta aggiornato al ${ddmm(store.asOf)} · Google da Marco</p></div>
+        <button class="btn report-btn" type="button" data-act="report" title="PDF per il cliente: speso del mese, programmato del mese dopo, speso sul totale">${icon('download', 15)}Report di ${monthShort(store.ym)}</button></header>
       ${tilesHtml(d)}
-      <div class="grid2">${d.channels.map(c => channelBox(c, d)).join('')}</div>
+      ${totalBox(d)}
+      <div class="grid2 after-total">${d.channels.map(c => channelBox(c, d)).join('')}</div>
       <section class="panel trend" id="dtrend" aria-label="Andamento"></section>
-      ${resultsBox(d)}${planBox(d)}${closingBox(d)}${notesBox(d)}
+      ${resultsBox(d)}${planBox(d)}${closingBox(d)}${notesBox(d)}${prevBox(d)}
     </div>`;
   mountTrend(document.getElementById('dtrend'), {
     daily: trendDaily(store.state, store.meta, [currentTab], store.asOf), plan: planFor(d), scope: currentTab, key: 'detail',
@@ -320,6 +390,28 @@ async function onClick(e) {
           msg = msg.trim();
         }
         await refreshAfter(msg);
+      }
+    }
+    if (b.dataset.act === 'noteFor') {
+      const text = await noteDialog(b.dataset.ym);
+      if (text) {
+        const r = await post('saveNote', { tab: currentTab, ym: b.dataset.ym, text }, store.code);
+        if (r.ok) await refreshAfter(`Nota salvata su ${monthShort(b.dataset.ym)}.`); else toast(`Non salvata: ${r.error}`);
+      }
+    }
+    if (b.dataset.act === 'report') {
+      // Google senza i numeri di Marco nel mese: il report mostrerebbe solo lo speso Meta. Si chiede prima.
+      const missing = buildDetail(store.state, store.meta, currentTab, store.ym, store.asOf, store.role, todayRome())
+        .channels.filter(c => c.kind === 'google' && c.state === 'nodata');
+      if (missing.length && !(await confirmDialog('Mancano i numeri Google',
+        `Marco non ha ancora inserito i numeri di ${missing.map(c => esc(channelLabel(c.title))).join(', ')} per ${monthLong(store.ym)}: nel report lo speso del mese sarebbe solo Meta.`,
+        'Scarica lo stesso'))) return;
+      try {
+        const { downloadReport } = await import('./report.js');
+        await downloadReport(buildReport(store.state, store.meta, currentTab, store.ym, store.asOf, todayRome()));
+      } catch (err) {
+        console.error(err);
+        toast(`Report non creato: ${err.message}`);
       }
     }
     if (b.dataset.act === 'lowerPlan') {

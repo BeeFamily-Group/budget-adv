@@ -286,7 +286,7 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
         spent = computed ?? m.sheet_spent ?? (y === today.slice(0, 7) ? 0 : null);
       }
       const programmed = (m.eur || 0) * (m.days || 0);
-      const row = { id: ch.id, kind: ch.kind, title: ch.title, eur: m.eur, days: m.days, proposal: m.proposal,
+      const row = { id: ch.id, kind: ch.kind, title: ch.title, eur: m.eur, days: m.days, proposal: m.proposal, start_day: m.start_day,
                programmed, spent, spentPct: spent !== null && programmed > 0 ? Math.round((spent / programmed) * 100) : null,
                requestStatus: ch.kind === 'meta' ? requestStatus(state, ch.id, y) : '',
                win: activeWindow(months, k), startDayCustom: Boolean(m.start_day),
@@ -298,6 +298,8 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
       if (row.requestStale) row.requestStatus += ` · data da aggiornare: ora dal ${ddmm(due)}`;
       return row;
     }),
+    // note di quel mese (tutti gli autori), le più recenti prima: si vedono accanto al mese nel piano
+    notes: state.notes.filter(n => n.tab === tab && n.ym === y).sort((a, b) => String(b.ts).localeCompare(String(a.ts))),
   }));
 
   let closing = null;
@@ -323,8 +325,66 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
 
   return {
     tab, ym, channels, plan, closing, notes,
-    results: { month: { meta: metaM, google: googleM, total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf, today)[0].kpi7 },
+    totals: planTotals(plan),
+    prev: prevYearTotals(s),
+    results:{ month: { meta: metaM, google: googleM, total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf, today)[0].kpi7 },
     can: { editMeta: role === 'francesco', editGoogle: role === 'marco', note: Boolean(role) },
+  };
+}
+
+const pctOf = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : null);
+
+// Totale del piano (tutti i mesi del foglio, ott 2026 – dic 2027): programmato e speso, per canale e in tutto.
+// upToYm: conta lo speso solo dei mesi fino a quello compreso (serve al report di un mese chiuso).
+export function planTotals(plan, upToYm = null) {
+  const channels = (plan[0]?.channels || []).map(c => ({ id: c.id, kind: c.kind, title: c.title, programmed: 0, spent: 0 }));
+  for (const p of plan) {
+    p.channels.forEach((c, k) => {
+      channels[k].programmed += c.programmed || 0;
+      if (c.spent !== null && c.spent !== undefined && (!upToYm || p.ym <= upToYm)) channels[k].spent += c.spent;
+    });
+  }
+  channels.forEach(c => { c.programmed = round2(c.programmed); c.spent = round2(c.spent); });
+  const programmed = round2(channels.reduce((a, c) => a + c.programmed, 0));
+  const spent = round2(channels.reduce((a, c) => a + c.spent, 0));
+  return {
+    from: plan[0]?.ym || null, to: plan.length ? plan[plan.length - 1].ym : null, channels,
+    total: { programmed, spent, remaining: round2(programmed - spent), pct: pctOf(spent, programmed) },
+  };
+}
+
+// Anno precedente: programmato e investito del blocco 2026 del vecchio foglio (righe 9-11 di ogni tab).
+export function prevYearTotals(structure) {
+  const channels = structure.channels
+    .filter(c => c.prev && ((c.prev.programmed || 0) > 0 || (c.prev.spent || 0) > 0))
+    .map(c => ({ id: c.id, kind: c.kind, title: c.title, year: c.prev.year, programmed: c.prev.programmed || 0, spent: c.prev.spent || 0 }));
+  if (!channels.length) return null;
+  const programmed = round2(channels.reduce((a, c) => a + c.programmed, 0));
+  const spent = round2(channels.reduce((a, c) => a + c.spent, 0));
+  return { year: channels[0].year, channels, total: { programmed, spent, pct: pctOf(spent, programmed) } };
+}
+
+// Report mensile per il cliente: solo speso del mese, programmato del mese dopo, speso sul totale del piano.
+export function buildReport(state, meta, tab, ym, asOf, today = asOf) {
+  const d = buildDetail(state, meta, tab, ym, asOf, null, today);
+  const k = d.plan.findIndex(p => p.ym === ym);
+  const row = d.plan[k];
+  const sum = (r, f) => round2(r.channels.reduce((a, c) => a + (f(c) || 0), 0));
+  let next = null;
+  const n = d.plan[k + 1];
+  if (n) {
+    const channels = n.channels.filter(c => c.programmed > 0)
+      .map(c => ({ kind: c.kind, title: c.title, eur: c.eur, days: c.win.days, programmed: c.programmed }));
+    const same = channels.length > 0 && channels.every(c => c.days === channels[0].days);
+    next = { ym: n.ym, programmed: sum(n, c => c.programmed), perDay: same ? round2(channels.reduce((a, c) => a + c.eur, 0)) : null,
+             days: same ? channels[0].days : null, channels };
+  }
+  const t = planTotals(d.plan, ym);
+  return {
+    tab, asOf, from: t.from, to: t.to,
+    month: { ym, programmed: sum(row, c => c.programmed), spent: sum(row, c => c.spent), inProgress: ym >= today.slice(0, 7) },
+    next,
+    total: t.total,
   };
 }
 

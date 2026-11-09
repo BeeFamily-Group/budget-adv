@@ -25,6 +25,17 @@ test('mesi e proposte', () => {
   assert.equal(m[0].eur, null);        // ottobre vuoto
 });
 
+test('anno precedente dalle righe 9-11 del tab', () => {
+  assert.deepEqual(L.readPrevYear(fx.values, 1), { year: 2026, programmed: 40530, spent: 33453.75 });
+  assert.deepEqual(L.readPrevYear(fx.values, 10), { year: 2026, programmed: 36110, spent: 26095.66 });
+});
+
+test('anno precedente: niente se le etichette non tornano', () => {
+  const moved = [...fx.values.slice(0, 8), Array(25).fill(''), ...fx.values.slice(8)];
+  assert.equal(L.readPrevYear(moved, 1), null);
+  assert.equal(L.readPrevYear([], 1), null);
+});
+
 test('id canale', () => assert.equal(L.channelId('Color Perla Village', 'A'), 'Color Perla Village|A'));
 
 test('cella del piano', () => {
