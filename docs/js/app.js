@@ -11,10 +11,8 @@ export const store = { state: null, meta: null, storico: null, ym: null, asOf: n
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const ddmm = (d) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : '—');
-const MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
-const MESI_LUNGHI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
-export const monthShort = (ym) => `${MESI[Number(ym.slice(5, 7)) - 1]} ${ym.slice(2, 4)}`;
-export const monthLong = (ym) => `${MESI_LUNGHI[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
+import { monthShort, monthLong } from './months.js';
+export { monthShort, monthLong };
 export const toneOf = (state) => ({ ok: 'good', under: 'amber', over: 'bad', early: 'bad' }[state] || 'neutral');
 
 export function pctHtml(v, goodWhenUp) {

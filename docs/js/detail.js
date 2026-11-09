@@ -314,6 +314,7 @@ function paint() {
   const i = list.indexOf(store.ym);
   const ro = store.role === 'ambra' ? `<span class="ro">Proposte sui mesi futuri</span>` : '';
   $d().innerHTML = `<div class="detail-head">
+      <img class="dlogo" src="img/beefamily-logo.png" alt="BeeFamily" width="93" height="22">
       <button class="back" type="button" data-act="back">${icon('arrowLeft', 16)}Strutture</button>
       <span class="crumbs">Strutture › <b>${esc(currentTab)}</b></span>
       <div class="month-nav"><button type="button" data-act="prevMonth" aria-label="Mese prima"${i <= 0 ? ' disabled' : ''}>${icon('chevronLeft', 16)}</button>
