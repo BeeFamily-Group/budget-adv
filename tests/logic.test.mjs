@@ -182,3 +182,17 @@ test('lo stato legge anche la Spesa Effettiva dello Sheet', () => {
   assert.equal(m[1].sheet_spent, 1000);
   assert.equal(m[2].sheet_spent, null);
 });
+
+test('scrittura in blocco del piano: motivo, canale, titolo e regole del savePlan', () => {
+  const ok = { reason: 'budget Ambra 09/11', items: [
+    { channel_id: 'Ciccio|A', title: 'BUDGET FACEBOOK ADS', ym: '2027-01', eur: 127 },
+    { channel_id: 'Ciccio|A', title: 'BUDGET FACEBOOK ADS', ym: '2026-11', days: 22, start_day: 9 },
+  ] };
+  assert.equal(L.validatePlanBatch(ok), '');
+  assert.equal(L.validatePlanBatch({ ...ok, reason: '' }), 'manca il motivo');
+  assert.equal(L.validatePlanBatch({ reason: 'x', items: [] }), 'nessuna voce');
+  assert.match(L.validatePlanBatch({ reason: 'x', items: [{ channel_id: 'Ciccio|A', ym: '2027-01', eur: 1 }] }), /manca canale o titolo/);
+  assert.match(L.validatePlanBatch({ reason: 'x', items: [{ ...ok.items[0], eur: 1500 }] }), /voce 1 \(Ciccio\|A 2027-01\): oltre 1\.000/);
+  assert.match(L.validatePlanBatch({ reason: 'x', items: [ok.items[0], { ...ok.items[1], start_day: 40 }] }), /voce 2/);
+  assert.match(L.validatePlanBatch({ reason: 'x', items: Array(401).fill(ok.items[0]) }), /troppe voci/);
+});

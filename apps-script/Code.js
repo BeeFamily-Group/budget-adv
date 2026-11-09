@@ -209,6 +209,31 @@ function updateRow(name, rowIndex, patch) {
   });
 }
 
+// €/giorno, giorni e "dal giorno" di un canale in un mese. giorniRows: righe del tab GIORNI già lette (scritture in blocco).
+function writePlanCells(who, action, loc, b, giorniRows) {
+  var cell = planCell(loc.values, loc.block.col, b.ym);
+  var eurRange = loc.sheet.getRange(cell.row, cell.colEur);
+  if (b.eur !== undefined && b.eur !== null && b.eur !== '') {
+    log(who, action, loc.sheet.getName() + '!' + eurRange.getA1Notation(), eurRange.getValue(), Number(b.eur));
+    eurRange.setValue(Number(b.eur)).setBackground(null);
+  }
+  if (b.days !== undefined && b.days !== null && b.days !== '') {
+    var dRange = loc.sheet.getRange(cell.row, cell.colDays);
+    log(who, action, loc.sheet.getName() + '!' + dRange.getA1Notation(), dRange.getValue(), b.days);
+    dRange.setValue(Number(b.days));
+  }
+  if (b.start_day !== undefined && b.start_day !== null && b.start_day !== '') {
+    var list = giorniRows || rows('GIORNI');
+    var giorni = list.filter(function (r) { return r.channel_id === b.channel_id && r.ym === b.ym; })[0];
+    if (giorni) updateRow('GIORNI', giorni._row, { start_day: b.start_day });
+    else {
+      SpreadsheetApp.getActive().getSheetByName('GIORNI').appendRow([b.channel_id, "'" + b.ym, b.start_day]);
+      if (giorniRows) giorniRows.push({ _row: SpreadsheetApp.getActive().getSheetByName('GIORNI').getLastRow(), channel_id: b.channel_id, ym: b.ym, start_day: b.start_day });
+    }
+    log(who, action, 'GIORNI ' + b.channel_id + ' ' + b.ym, giorni ? giorni.start_day : '', b.start_day);
+  }
+}
+
 var USER_ACTIONS = {
   whoami: function (role) { return { ok: true, role: role }; },
 
@@ -221,22 +246,7 @@ var USER_ACTIONS = {
   savePlan: function (role, b) {
     var loc = locateChecked(b.channel_id, b.title);
     if (!canEditChannel(role, loc.block.kind)) return { ok: false, error: 'forbidden' };
-    var cell = planCell(loc.values, loc.block.col, b.ym);
-    var eurRange = loc.sheet.getRange(cell.row, cell.colEur);
-    if (b.eur !== undefined && b.eur !== null && b.eur !== '') {
-      log(role, 'savePlan', loc.sheet.getName() + '!' + eurRange.getA1Notation(), eurRange.getValue(), Number(b.eur));
-      eurRange.setValue(Number(b.eur)).setBackground(null);
-    }
-    if (b.days !== undefined && b.days !== null && b.days !== '') {
-      var dRange = loc.sheet.getRange(cell.row, cell.colDays);
-      log(role, 'savePlan', loc.sheet.getName() + '!' + dRange.getA1Notation(), dRange.getValue(), b.days);
-      dRange.setValue(Number(b.days));
-    }
-    if (b.start_day !== undefined && b.start_day !== null && b.start_day !== '') {
-      var giorni = rows('GIORNI').filter(function (r) { return r.channel_id === b.channel_id && r.ym === b.ym; })[0];
-      if (giorni) updateRow('GIORNI', giorni._row, { start_day: b.start_day });
-      else SpreadsheetApp.getActive().getSheetByName('GIORNI').appendRow([b.channel_id, "'" + b.ym, b.start_day]);
-    }
+    writePlanCells(role, 'savePlan', loc, b, null);
     return { ok: true };
   },
 
@@ -270,6 +280,23 @@ var USER_ACTIONS = {
 };
 
 var ROUTINE_ACTIONS = {
+  // Piano in blocco (budget decisi fuori dalla dashboard, approvati da Francesco). Prima si controllano TUTTE le voci
+  // (titolo del blocco e riga del mese): se una non torna non si scrive niente. Nel LOG: "routine · <motivo>".
+  planBatch: function (b) {
+    var bad = validatePlanBatch(b);
+    if (bad) return { ok: false, error: bad };
+    var locs = {};
+    b.items.forEach(function (it) {
+      var loc = locs[it.channel_id] || (locs[it.channel_id] = locateChannel(it.channel_id));
+      var wrong = titleMismatch(loc.block, it.title, loc.sheet.getName());
+      if (wrong) throw new Error(wrong);
+      planCell(loc.values, loc.block.col, it.ym);
+    });
+    var who = 'routine · ' + String(b.reason).slice(0, 60);
+    var giorniRows = rows('GIORNI');
+    b.items.forEach(function (it) { writePlanCells(who, 'planBatch', locs[it.channel_id], it, giorniRows); });
+    return { ok: true, written: b.items.length };
+  },
   pendingRequests: function (b) {
     var today = String(b.now || todayRome()).slice(0, 10);
     var all = rows('RICHIESTE META');

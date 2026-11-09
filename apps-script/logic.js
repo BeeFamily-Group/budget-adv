@@ -204,6 +204,22 @@ function given(v) { return v !== undefined && v !== null && v !== ''; }
 function isAmount(v) { return given(v) && isFinite(Number(v)) && Number(v) >= 0; }
 function isIntIn(v, lo, hi) { var n = Number(v); return given(v) && Math.floor(n) === n && n >= lo && n <= hi; }
 
+// Scrittura in blocco del piano con la chiave della routine (es. i budget di Ambra del 09/11):
+// motivo obbligatorio e ogni voce controllata come un savePlan, con canale e titolo del blocco.
+function validatePlanBatch(b) {
+  b = b || {};
+  if (!given(b.reason)) return 'manca il motivo';
+  if (!b.items || !b.items.length) return 'nessuna voce';
+  if (b.items.length > 400) return 'troppe voci in una volta (massimo 400)';
+  for (var i = 0; i < b.items.length; i++) {
+    var it = b.items[i] || {};
+    if (!given(it.channel_id) || !given(it.title)) return 'voce ' + (i + 1) + ': manca canale o titolo';
+    var bad = validatePayload('savePlan', it);
+    if (bad) return 'voce ' + (i + 1) + ' (' + it.channel_id + ' ' + it.ym + '): ' + bad;
+  }
+  return '';
+}
+
 function validatePayload(action, b) {
   b = b || {};
   if (action === 'savePlan') {
@@ -246,7 +262,7 @@ if (typeof module !== 'undefined') {
     LAYOUT: LAYOUT, monthsList: monthsList, monthLabel: monthLabel, colLetter: colLetter,
     findBlocks: findBlocks, readMonths: readMonths, readPrevYear: readPrevYear, channelId: channelId, planCell: planCell,
     roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote,
-    spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, titleMismatch: titleMismatch, dueRequests: dueRequests, expiredRequests: expiredRequests, resultStatus: resultStatus,
+    spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, validatePlanBatch: validatePlanBatch, titleMismatch: titleMismatch, dueRequests: dueRequests, expiredRequests: expiredRequests, resultStatus: resultStatus,
     chunkText: chunkText, bootstrapClosed: bootstrapClosed, ymOf: ymOf,
   };
 }
