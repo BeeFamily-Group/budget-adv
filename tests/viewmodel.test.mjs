@@ -409,21 +409,35 @@ test('report dell\'ultimo mese del piano: nessun mese dopo', () => {
   assert.equal(buildReport(withReq, meta, 'Ciccio', '2027-12', '2026-11-14', '2026-11-14').next, null);
 });
 
-import { prevMonthly } from '../docs/js/viewmodel.js';
+import { prevYearMonths, updateDates } from '../docs/js/viewmodel.js';
 
-test('anno precedente mese per mese: somma dei canali della struttura e quota sull\'anno', () => {
+test('anno precedente da gennaio a dicembre: vecchio foglio fino a settembre, poi il piano', () => {
   const storico = { tabs: { Ciccio: {
-    'BUDGET FACEBOOK ADS': { '2026-01': { programmed: 100, spent: 300 }, '2026-02': { programmed: 100, spent: 100 } },
+    'BUDGET FACEBOOK ADS': { '2026-01': { programmed: 100, spent: 300 }, '2026-02': { programmed: 100, spent: 100 }, '2026-05': { programmed: 200, spent: null }, '2026-10': { programmed: 0, spent: null } },
     'BUDGET GOOGLE ADS': { '2026-01': { programmed: 50, spent: 100 }, '2026-03': { programmed: 0, spent: null } },
     'ALTRO BLOCCO': { '2026-01': { programmed: 999, spent: 999 } },
   } } };
   const s = withReq.structures.find(x => x.tab === 'Ciccio');
-  assert.deepEqual(prevMonthly(storico, s), [
-    { ym: '2026-01', spent: 400, share: 80 },
-    { ym: '2026-02', spent: 100, share: 20 },
-    { ym: '2026-03', spent: 0, share: 0 },
-  ]);
-  assert.deepEqual(prevMonthly(storico, s, '2026-02'), [{ ym: '2026-01', spent: 400, share: 100 }]);
-  assert.equal(prevMonthly(null, s), null);
-  assert.equal(prevMonthly({ tabs: {} }, s), null);
+  const plan = [
+    { ym: '2026-10', channels: [{ spent: 300, programmed: 310 }, { spent: null, programmed: 100 }] },
+    { ym: '2026-11', channels: [{ spent: 50, programmed: 600 }, { spent: null, programmed: 0 }] },
+    { ym: '2026-12', channels: [{ spent: null, programmed: 620 }, { spent: null, programmed: 0 }] },
+    { ym: '2027-01', channels: [{ spent: null, programmed: 700 }, { spent: null, programmed: 0 }] },
+  ];
+  const m = prevYearMonths(storico, s, plan, '2026-11');
+  assert.equal(m.length, 12);
+  assert.deepEqual(m.map(x => x.ym), ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12']);
+  assert.deepEqual(m[0], { ym: '2026-01', spent: 400, share: 47, status: 'closed', programmed: null });
+  assert.deepEqual(m[2], { ym: '2026-03', spent: 0, share: 0, status: 'closed', programmed: null });
+  assert.deepEqual(m[3], { ym: '2026-04', spent: null, share: null, status: 'closed', programmed: null });   // niente nel vecchio foglio
+  assert.deepEqual(m[4], { ym: '2026-05', spent: null, share: null, status: 'closed', programmed: null });   // programmato ma speso non registrato: non è zero
+  assert.deepEqual(m[9], { ym: '2026-10', spent: 300, share: 35, status: 'closed', programmed: 410 });      // dal piano, non dal vecchio foglio
+  assert.deepEqual(m[10], { ym: '2026-11', spent: 50, share: 6, status: 'current', programmed: 600 });
+  assert.deepEqual(m[11], { ym: '2026-12', spent: null, share: null, status: 'future', programmed: 620 });
+  assert.equal(prevYearMonths(null, s, plan, '2026-11')[0].spent, null);   // senza vecchio foglio restano i mesi del piano
+});
+
+test('date di aggiornamento: Meta automatico, Google dall\'ultimo inserimento di Marco', () => {
+  assert.deepEqual(updateDates({ as_of: '2026-11-08' }, state), { meta: '2026-11-08', google: '2026-11-12' });
+  assert.deepEqual(updateDates({ as_of: null }, { ...state, google: [] }), { meta: null, google: null });
 });

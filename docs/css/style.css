@@ -57,7 +57,11 @@ table, .num, .kpi .v, .ch-num, .tiles .v { font-variant-numeric: tabular-nums; }
 .brand-name { font: 700 16px/1 var(--display); color: #fff; letter-spacing: -0.01em; }
 .brand-name small { margin-left: 6px; font: 500 12px/1 var(--sans); color: var(--night-muted); letter-spacing: 0; }
 .top-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.fresh { font-size: 12px; color: var(--night-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fresh { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--night-ink); white-space: nowrap; min-width: 0; }
+.upd { display: inline-flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+.upd b { color: #fff; font-weight: 600; }
+.upd em { font-style: normal; color: var(--night-muted); }
+.upd.tag { color: var(--yel); text-transform: uppercase; font-size: 11px; font-weight: 600; letter-spacing: .04em; }
 .who { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--yel); background: var(--yel); color: var(--night); border-radius: 999px;
   padding: 6px 14px; font-size: 13px; font-weight: 600; white-space: nowrap; transition: background .15s, border-color .15s, color .15s; }
 .who:hover { background: var(--yel-hover); border-color: var(--yel-hover); }
@@ -286,37 +290,22 @@ td.status { font-size: 12px; color: var(--muted); white-space: normal; min-width
 /* Anno precedente mese per mese */
 .pm-h { margin: 18px 0 8px; font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; }
 .pm { display: grid; gap: 5px; margin-bottom: 8px; }
-.pm-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) 76px 36px; gap: 10px; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+.pm-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) 76px 96px; gap: 10px; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
 .pm-row span:first-child { color: var(--ink-2); }
 .pm-track { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
 .pm-track i { display: block; height: 100%; border-radius: 4px; background: var(--navy); }
 .pm-row b { text-align: right; font-weight: 600; }
-.pm-row em { font-style: normal; color: var(--muted); text-align: right; }
+.pm-row em { font-style: normal; color: var(--muted); text-align: right; white-space: nowrap; }
+.pm-row b.muted { color: var(--muted); font-weight: 500; }
+.pm-row.current .pm-track i { background: var(--yel); }
+.pm-row.current em { color: var(--ink-2); font-weight: 600; }
+.pm-row.future span:first-child { color: var(--muted); }
 
-/* Note del mese: riga sotto il mese, a tutta larghezza; il testo resta fermo a sinistra mentre la tabella scorre */
-table.plan tr.has-notes td { border-bottom-color: transparent; }
-table.plan tr.note-row td { position: static; padding-top: 0; text-align: left; white-space: normal; }
-.pnotes-in { position: sticky; left: 0; max-width: min(720px, calc(100vw - 72px)); display: grid; gap: 4px; padding: 8px 10px; border-left: 3px solid var(--yel);
-  background: var(--surface-2); border-radius: 0 6px 6px 0; }
-.pnote { font-size: 12px; line-height: 1.45; color: var(--ink-2); }
-.pnote time { color: var(--muted); margin-right: 2px; }
-.mname { display: inline-block; min-width: 46px; }
-.note-add { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px; border: 1px dashed var(--line-2); border-radius: 6px; background: none;
-  color: var(--muted); font-size: 11px; font-weight: 500; min-height: 24px; }
-.note-add:hover { color: var(--ink); border-color: var(--ink-2); border-style: solid; }
 .legend-row { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
 .legend-row span { display: inline-flex; align-items: center; gap: 6px; }
 
-/* Note */
-.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-.note-col { background: var(--surface-2); border-radius: var(--radius); padding: 14px; }
-.note-col h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
-.note { font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--line); white-space: pre-wrap; }
-.note:last-of-type { border-bottom: 0; }
-.note time { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
 textarea { width: 100%; min-height: 72px; border: 1px solid var(--line-2); border-radius: var(--radius); padding: 10px; resize: vertical; background: var(--surface); margin-top: 8px; }
 textarea:focus { outline: 0; border-color: var(--focus); box-shadow: 0 0 0 3px var(--ring); }
-.note-col .btn { margin-top: 8px; }
 .form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .form label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
 .form input, .form select { height: 38px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: var(--radius); font-size: 16px; background: var(--surface); }
@@ -352,7 +341,8 @@ textarea:focus { outline: 0; border-color: var(--focus); box-shadow: 0 0 0 3px v
 }
 @media (max-width: 640px) {
   .topbar, .detail-head { padding: 8px 16px; }
-  .fresh { display: none; }
+  .fresh { flex-direction: column; align-items: flex-end; gap: 1px; font-size: 11px; }
+  .upd.tag { display: none; }
   .page { padding: 20px 16px 48px; }
   .page-head h1 { font-size: 24px; }
   .search { flex: 1 1 100%; }

@@ -376,22 +376,48 @@ export function prevYearTotals(structure) {
 // Anno precedente mese per mese (gen–dic 2026 dal vecchio foglio, data/storico-2026.json): investito di tutti
 // i canali della struttura e quota sul totale dell'anno. null se il file non c'è o la struttura non ha dati.
 // beforeYm: solo i mesi prima del piano attuale (da ottobre 2026 i mesi stanno già nel piano, e il vecchio foglio non li ha completi).
-export function prevMonthly(storico, structure, beforeYm = null) {
-  const chans = storico && storico.tabs && storico.tabs[structure.tab];
-  if (!chans) return null;
+export function prevYearMonths(storico, structure, plan, nowYm) {
+  // Anno precedente da gennaio a dicembre: i mesi prima dell'inizio del piano dal vecchio foglio budget,
+  // gli altri dal piano (speso Meta automatico + Google di Marco). Mese in corso e mesi futuri segnati.
+  const start = plan[0].ym;
+  const year = Number(start.slice(0, 4));
+  const chans = (storico && storico.tabs && storico.tabs[structure.tab]) || {};
   const titles = new Set(structure.channels.map(c => c.title));
-  const by = new Map();
-  for (const [title, months] of Object.entries(chans)) {
-    if (!titles.has(title)) continue;
-    for (const [ym, v] of Object.entries(months)) {
-      if (beforeYm && ym >= beforeYm) continue;
-      by.set(ym, round2((by.get(ym) || 0) + (v.spent || 0)));
+  // Vecchio foglio: somma dello speso dei canali. Speso vuoto con un programmato = non registrato (null, non zero);
+  // vuoto senza niente di programmato = 0. Mese assente = null.
+  const old = (ym) => {
+    let sum = null;
+    let planned = false;
+    for (const [title, months] of Object.entries(chans)) {
+      const v = titles.has(title) && months[ym];
+      if (!v) continue;
+      if (v.spent !== null && v.spent !== undefined) sum = round2((sum || 0) + v.spent);
+      else if (v.programmed > 0) planned = true;
     }
+    if (sum !== null) return sum;
+    const present = Object.entries(chans).some(([title, months]) => titles.has(title) && months[ym]);
+    return present && !planned ? 0 : null;
+  };
+  const rows = [];
+  for (let m = 1; m <= 12; m++) {
+    const ym = `${year}-${String(m).padStart(2, '0')}`;
+    const status = ym < nowYm ? 'closed' : (ym === nowYm ? 'current' : 'future');
+    if (ym < start) { rows.push({ ym, spent: old(ym), status, programmed: null }); continue; }
+    const p = plan.find(x => x.ym === ym);
+    const spentVals = p ? p.channels.map(c => c.spent).filter(v => v !== null && v !== undefined) : [];
+    const spent = spentVals.length ? round2(spentVals.reduce((a, v) => a + v, 0)) : (status === 'future' ? null : 0);
+    const programmed = p ? round2(p.channels.reduce((a, c) => a + (c.programmed || 0), 0)) : null;
+    rows.push({ ym, spent, status, programmed });
   }
-  if (!by.size) return null;
-  const total = [...by.values()].reduce((a, v) => a + v, 0);
-  return [...by.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([ym, spent]) => ({ ym, spent, share: total > 0 ? Math.round((spent / total) * 100) : 0 }));
+  const total = rows.reduce((a, r) => a + (r.spent || 0), 0);
+  return rows.map(r => ({ ym: r.ym, spent: r.spent, share: r.spent === null ? null : (total > 0 ? Math.round((r.spent / total) * 100) : 0),
+    status: r.status, programmed: r.programmed }));
+}
+
+// Date di aggiornamento in alto: Meta dalla lettura automatica della notte, Google dall'ultimo inserimento di Marco.
+export function updateDates(meta, state) {
+  const dates = (state.google || []).map(g => String(g.date || '').slice(0, 10)).filter(Boolean).sort();
+  return { meta: (meta && meta.as_of) || null, google: dates.length ? dates[dates.length - 1] : null };
 }
 
 // Report mensile per il cliente: solo speso del mese, programmato del mese dopo, speso sul totale del piano.

@@ -266,7 +266,7 @@ var USER_ACTIONS = {
     var loc = locateChecked(b.channel_id, b.title);
     var mode = planWriteMode(role, loc.block.kind, b.ym, todayRome().slice(0, 7));
     if (!mode) {
-      return { ok: false, error: role === 'ambra' ? 'si possono proporre solo i mesi dopo quello in corso: per questo mese usa la nota' : 'forbidden' };
+      return { ok: false, error: role === 'ambra' ? 'si possono proporre solo i mesi dopo quello in corso: per questo mese la richiesta va su Asana' : 'forbidden' };
     }
     if (mode === 'proposal') return writeProposal(role, loc, b);
     writePlanCells(role, 'savePlan', loc, b, null);

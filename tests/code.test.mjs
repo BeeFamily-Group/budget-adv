@@ -77,7 +77,7 @@ test('web app: Ambra non scrive il mese in corso', () => {
   const { app, sheets } = setupApp();
   const r = app.USER_ACTIONS.savePlan('ambra', { ...META, ym: '2026-11', eur: 130 });
   assert.equal(r.ok, false);
-  assert.match(r.error, /usa la nota/);
+  assert.match(r.error, /Asana/);
   assert.equal(sheets.NOTE.values.length, 1);
 });
 

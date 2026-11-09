@@ -1,6 +1,6 @@
 // Schermata principale: ricerca, mesi, andamento, schede per struttura, campagne da assegnare.
 import { getState, getMeta, getStorico, isDemo } from './api.js';
-import { buildCards, unassigned, channelLabel, stateLabel, staleAccounts, staleText, macLate, trendDaily, matchQuery } from './viewmodel.js';
+import { buildCards, channelLabel, stateLabel, staleAccounts, staleText, macLate, trendDaily, matchQuery, updateDates } from './viewmodel.js';
 import { fmtEur } from './calc.js';
 import { icon } from './icons.js';
 import { mountTrend } from './trend.js';
@@ -65,6 +65,14 @@ function cardHtml(card) {
     </button>`;
 }
 
+// In alto a destra solo le date di aggiornamento: Meta automatico (notte), Google manuale (Marco).
+export function freshnessHtml(dates) {
+  const tag = isDemo() ? 'dati di prova' : SHEET_LABEL;
+  return `<span class="upd"><b>Meta</b> ${dates.meta ? ddmm(dates.meta) : '—'} <em>automatico</em></span>`
+    + `<span class="upd"><b>Google</b> ${dates.google ? ddmm(dates.google) : '—'} <em>manuale</em></span>`
+    + (tag ? `<span class="upd tag">${esc(tag)}</span>` : '');
+}
+
 function bannersHtml(state, meta) {
   const out = [];
   const late = macLate(meta.as_of, store.today);
@@ -87,7 +95,7 @@ export function render() {
   const yms = state.structures[0]?.channels[0]?.months.map(m => m.ym) || [];
   const nowYm = (store.today || asOf).slice(0, 7);
   $('months').innerHTML = yms.map(y => `<button type="button" data-ym="${y}" aria-pressed="${y === ym}"${y === nowYm ? ' class="now" title="mese in corso"' : ''}>${monthShort(y)}</button>`).join('');
-  $('freshness').textContent = `Meta aggiornato al ${ddmm(asOf)} · Google da Marco${isDemo() ? ' · DATI DI PROVA' : (SHEET_LABEL ? ` · ${SHEET_LABEL}` : '')}`;
+  $('freshness').innerHTML = freshnessHtml(updateDates(store.meta, state));
   $('banners').innerHTML = bannersHtml(state, meta);
 
   const cards = buildCards(state, meta, ym, asOf, store.today);
@@ -111,14 +119,6 @@ export function render() {
   const scope = shown.length === cards.length ? `tutte le ${cards.length} strutture`
     : (shown.length === 1 ? shown[0].name : `${shown.length} strutture filtrate`);
   mountTrend($('overview'), { daily: trendDaily(state, meta, shown.map(c => c.tab), asOf), scope, key: 'home' });
-
-  const un = unassigned(state, meta, ym, asOf);
-  $('unassigned').innerHTML = un.length
-    ? `<div class="box"><div class="box-head"><div><h2>Campagne da assegnare</h2>
-        <p class="small">Hanno speso a ${monthLong(ym)} ma non sono collegate a nessuna struttura: correggi il tab MAPPA dello Sheet.</p></div></div>
-        <div class="scroll-x"><table class="t"><thead><tr><th>Campagna</th><th>Account</th><th>Speso</th></tr></thead>
-        <tbody>${un.map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.account_id)}</td><td>${fmtEur(u.spent)}</td></tr>`).join('')}</tbody></table></div></div>`
-    : '';
 }
 
 async function openDetail(tab) {
