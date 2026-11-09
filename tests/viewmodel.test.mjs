@@ -448,3 +448,27 @@ test('riga delle date sotto il nome: ultimo aggiornamento in grassetto', () => {
   assert.equal(updateLineHtml({ meta: '2026-11-08', google: null }),
     'Meta aggiornato al <b>08/11/2026</b> (automatico) · Google non ancora inserito da Marco (manuale)');
 });
+
+import { structureName } from '../docs/js/viewmodel.js';
+
+const NAMES = { Ciccio: { name: 'Ciccio Family Hotel', place: 'Misano Adriatico' } };
+
+test('nomi reali: nome e località dal file, altrimenti il nome del tab', () => {
+  assert.deepEqual(structureName(NAMES, 'Ciccio'), { name: 'Ciccio Family Hotel', place: 'Misano Adriatico' });
+  assert.deepEqual(structureName(NAMES, 'B612'), { name: 'B612', place: '' });
+  assert.deepEqual(structureName(null, 'B612'), { name: 'B612', place: '' });
+});
+
+test('nomi reali nelle schede della home: il tab resta la chiave', () => {
+  const c = buildCards(state, meta, '2026-11', '2026-11-14', '2026-11-14', NAMES).find(x => x.tab === 'Ciccio');
+  assert.equal(c.name, 'Ciccio Family Hotel');
+  assert.equal(c.place, 'Misano Adriatico');
+  assert.equal(buildCards(state, meta, '2026-11', '2026-11-14').find(x => x.tab === 'B612').name, 'B612');
+});
+
+test('nomi reali nel report', () => {
+  const r = buildReport(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', '2026-11-14', NAMES);
+  assert.equal(r.name, 'Ciccio Family Hotel');
+  assert.equal(r.place, 'Misano Adriatico');
+  assert.equal(r.tab, 'Ciccio');
+});

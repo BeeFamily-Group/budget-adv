@@ -1,5 +1,5 @@
 // Dettaglio di una struttura: canali, risultati, piano mese per mese, chiusura, anno precedente. Le richieste stanno su Asana.
-import { buildDetail, buildReport, prevYearMonths, updateDates, updateLineHtml, channelLabel, stateLabel, channelView, applyFrom, staleText, trendDaily } from './viewmodel.js';
+import { buildDetail, buildReport, prevYearMonths, updateDates, updateLineHtml, structureName, channelLabel, stateLabel, channelView, applyFrom, staleText, trendDaily } from './viewmodel.js';
 import { fmtEur, parseEur } from './calc.js';
 import { store, esc, ddmm, monthShort, monthLong, kpiHtml, barHtml, reload, render as renderHome } from './app.js';
 import { post } from './api.js';
@@ -276,17 +276,18 @@ function paint() {
   const d = buildDetail(store.state, store.meta, currentTab, store.ym, store.asOf, store.role, todayRome());
   const list = yms();
   const i = list.indexOf(store.ym);
+  const real = structureName(store.names, currentTab);
   const ro = store.role === 'ambra' ? `<span class="ro">Proposte sui mesi futuri</span>` : '';
   $d().innerHTML = `<div class="detail-head">
       <img class="dlogo" src="img/beefamily-logo.png" alt="BeeFamily" width="93" height="22">
       <button class="back" type="button" data-act="back">${icon('arrowLeft', 16)}Strutture</button>
-      <span class="crumbs">Strutture › <b>${esc(currentTab)}</b></span>
+      <span class="crumbs">Strutture › <b>${esc(real.name)}</b></span>
       <div class="month-nav"><button type="button" data-act="prevMonth" aria-label="Mese prima"${i <= 0 ? ' disabled' : ''}>${icon('chevronLeft', 16)}</button>
         <span>${monthShort(store.ym)}</span>
         <button type="button" data-act="nextMonth" aria-label="Mese dopo"${i >= list.length - 1 ? ' disabled' : ''}>${icon('chevronRight', 16)}</button></div>
       ${ro}</div>
     <div class="detail-body">
-      <header class="dh"><div><h1>${esc(currentTab)}</h1><p class="sub">${monthLong(store.ym)} · ${updateLineHtml(updateDates(store.meta, store.state))}</p></div>
+      <header class="dh"><div><h1>${esc(real.name)}</h1><p class="sub">${real.place ? `${esc(real.place)} · ` : ''}${monthLong(store.ym)} · ${updateLineHtml(updateDates(store.meta, store.state))}</p></div>
         <button class="btn report-btn" type="button" data-act="report" title="PDF per il cliente: speso del mese, programmato del mese dopo, speso sul totale">${icon('download', 15)}Report di ${monthShort(store.ym)}</button></header>
       ${tilesHtml(d)}
       ${totalBox(d)}
@@ -382,7 +383,7 @@ async function onClick(e) {
         'Scarica lo stesso'))) return;
       try {
         const { downloadReport } = await import('./report.js');
-        await downloadReport(buildReport(store.state, store.meta, currentTab, store.ym, store.asOf, todayRome()));
+        await downloadReport(buildReport(store.state, store.meta, currentTab, store.ym, store.asOf, todayRome(), store.names));
       } catch (err) {
         console.error(err);
         toast(`Report non creato: ${err.message}`);

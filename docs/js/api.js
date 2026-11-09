@@ -19,6 +19,16 @@ export async function getMeta() {
   return r.json();
 }
 
+// Nomi reali delle strutture (data/strutture.json): se manca il file restano i nomi dei tab.
+export async function getNames() {
+  try {
+    const r = await fetch('data/strutture.json', { cache: 'no-store' });
+    return r.ok ? await r.json() : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // Anno precedente mese per mese (file fisso estratto dal vecchio foglio). Se manca, la pagina va avanti senza.
 export async function getStorico() {
   try {

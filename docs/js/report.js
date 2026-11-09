@@ -75,7 +75,7 @@ const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const dmy = (d) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : '');
 
 export function reportFileName(r) {
-  const tab = String(r.tab).replace(/&/g, 'e').replace(/[\\/:*?"<>|]/g, '-');
+  const tab = String(r.name || r.tab).replace(/&/g, 'e').replace(/[\\/:*?"<>|]/g, '-');
   return `Report ADV ${tab} - ${cap(monthLong(r.month.ym))}.pdf`;
 }
 
@@ -113,10 +113,15 @@ export function reportPdf(r, JsPDF, today, assets = {}) {
   color(LIGHT); font('regular', 9);
   doc.text(r.month.inProgress ? `mese in corso · dati al ${dmy(r.asOf)}` : 'mese concluso', W - X, 34, { align: 'right' });
 
-  // Struttura
-  eyebrow('Struttura', X, 59, MUTED);
-  color(INK); font('extrabold', 26); doc.text(String(r.tab), X, 70);
-  fill(YEL); doc.rect(X, 74, 16, 1.4, 'F');
+  // Struttura: nome reale (rimpicciolito se non sta in una riga) e località
+  eyebrow('Struttura', X, 57, MUTED);
+  const name = String(r.name || r.tab);
+  let size = 26;
+  font('extrabold', size);
+  while (doc.getTextWidth(name) > CW && size > 16) { size -= 1; font('extrabold', size); }
+  color(INK); doc.text(name, X, 68);
+  if (r.place) { color(BODY); font('regular', 10.5); doc.text(r.place, X, 75); }
+  fill(YEL); doc.rect(X, 79, 16, 1.4, 'F');
 
   // Riquadri chiari con il filetto giallo a sinistra
   const card = (y, h, label) => {
@@ -134,7 +139,7 @@ export function reportPdf(r, JsPDF, today, assets = {}) {
   const line = (y, text, c = BODY, size = 10) => { color(c); font('regular', size); doc.text(text, X + 9, y); };
 
   // 1. Investimento del mese
-  let y = 82;
+  let y = 86;
   const h1 = r.month.inProgress ? 50 : 44;
   card(y, h1, `Investimento di ${monthLong(r.month.ym)}`);
   big(y + 27, fmtEur(r.month.spent));
@@ -142,7 +147,7 @@ export function reportPdf(r, JsPDF, today, assets = {}) {
   if (r.month.inProgress) line(y + 44, `il mese è ancora in corso: dato aggiornato al ${dmy(r.asOf)}`, MUTED, 8);
 
   // 2. Programmazione del mese dopo
-  y += h1 + 7;
+  y += h1 + 6;
   if (r.next) {
     const lines = [];
     if (!(r.next.programmed > 0)) lines.push('nessun investimento programmato');
@@ -152,7 +157,7 @@ export function reportPdf(r, JsPDF, today, assets = {}) {
     card(y, h, `Programmazione di ${monthLong(r.next.ym)}`);
     big(y + 27, fmtEur(r.next.programmed));
     lines.forEach((t, k) => line(y + 37 + k * 6, t));
-    y += h + 7;
+    y += h + 6;
   }
 
   // 3. Avanzamento sul budget complessivo: riquadro blu notte, barra gialla

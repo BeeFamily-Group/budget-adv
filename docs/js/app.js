@@ -1,11 +1,11 @@
 // Schermata principale: ricerca, mesi, andamento, schede per struttura, campagne da assegnare.
-import { getState, getMeta, getStorico } from './api.js';
+import { getState, getMeta, getStorico, getNames } from './api.js';
 import { buildCards, channelLabel, stateLabel, staleAccounts, staleText, macLate, trendDaily, matchQuery } from './viewmodel.js';
 import { fmtEur } from './calc.js';
 import { icon } from './icons.js';
 import { mountTrend } from './trend.js';
 
-export const store = { state: null, meta: null, storico: null, ym: null, asOf: null, today: null, q: '', onlyOff: false, role: null, code: null };
+export const store = { state: null, meta: null, storico: null, names: null, ym: null, asOf: null, today: null, q: '', onlyOff: false, role: null, code: null };
 
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -57,7 +57,7 @@ function cardHtml(card) {
   const main = card.channels.find(c => c.state === card.overall) || card.channels[0];
   const chip = main ? `<span class="chip ${card.overall}">${esc(stateLabel(card.overall, main.pct))}</span>` : '';
   return `<button class="card" type="button" data-tab="${esc(card.tab)}" aria-label="Apri ${esc(card.name)}">
-      <div class="card-head"><h3>${esc(card.name)}</h3><span class="right">${chip}<span class="go">${icon('arrowRight', 16)}</span></span></div>
+      <div class="card-head"><h3>${esc(card.name)}${card.place ? `<small>${esc(card.place)}</small>` : ''}</h3><span class="right">${chip}<span class="go">${icon('arrowRight', 16)}</span></span></div>
       ${card.proposals.length ? `<div class="card-prop">Da confermare: ${card.proposals.map(monthShort).join(' e ')}</div>` : ''}
       ${card.channels.map(channelHtml).join('')}
       ${card.kpi7 ? `${kpiHtml(card.kpi7)}<div class="card-foot"><span>Ultimi 7 giorni rispetto ai 7 prima · solo Meta</span></div>` : ''}
@@ -88,9 +88,9 @@ export function render() {
   $('months').innerHTML = yms.map(y => `<button type="button" data-ym="${y}" aria-pressed="${y === ym}"${y === nowYm ? ' class="now" title="mese in corso"' : ''}>${monthShort(y)}</button>`).join('');
   $('banners').innerHTML = bannersHtml(state, meta);
 
-  const cards = buildCards(state, meta, ym, asOf, store.today);
+  const cards = buildCards(state, meta, ym, asOf, store.today, store.names);
   const offOf = (c) => c.overall === 'under' || c.overall === 'over' || c.overall === 'early';
-  const found = cards.filter(c => matchQuery(c.name, store.q));
+  const found = cards.filter(c => matchQuery(`${c.name} ${c.place} ${c.tab}`, store.q));
   const shown = store.onlyOff ? found.filter(offOf) : found;
   const off = cards.filter(offOf).length;
   $('offCount').textContent = off ? String(off) : '';
@@ -121,10 +121,12 @@ async function openDetail(tab) {
 }
 
 export async function reload() {
-  const [state, meta, storico] = await Promise.all([getState(), getMeta(), store.storico ? store.storico : getStorico()]);
+  const [state, meta, storico, names] = await Promise.all([getState(), getMeta(), store.storico ? store.storico : getStorico(),
+    store.names ? store.names : getNames()]);
   store.state = state;
   store.meta = meta;
   store.storico = storico;
+  store.names = names;
   store.today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
   store.asOf = meta.as_of || new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   store.ym = store.ym || store.asOf.slice(0, 7);

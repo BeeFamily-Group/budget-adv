@@ -79,4 +79,14 @@ test('report: le tre cose decise con Ambra, niente altro', () => {
 
 test('report: nome del file', () => {
   assert.equal(reportFileName({ ...r, tab: 'H&V' }), 'Report ADV HeV - Novembre 2026.pdf');
+  assert.equal(reportFileName({ ...r, name: 'El Cid Campeador Family Hotel' }), 'Report ADV El Cid Campeador Family Hotel - Novembre 2026.pdf');
+});
+
+test('report: nome reale e località della struttura', () => {
+  const { JsPDF, calls } = recorder();
+  reportPdf({ ...r, name: 'El Cid Campeador Family Hotel', place: 'Milano Marittima' }, JsPDF, '2026-11-09', {});
+  const all = texts(calls);
+  assert.ok(all.includes('El Cid Campeador Family Hotel'));
+  assert.ok(all.includes('Milano Marittima'));
+  assert.ok(!all.includes('El Cid'));
 });

@@ -88,6 +88,12 @@ export function macLate(asOf, today) {
 
 // Ricerca: senza accenti e maiuscole, tutte le parole cercate in qualsiasi ordine.
 const fold = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// Nome reale e località della struttura (data/strutture.json); senza voce resta il nome del tab dello Sheet.
+export function structureName(names, tab) {
+  const n = names && names[tab];
+  return { name: (n && n.name) || tab, place: (n && n.place) || '' };
+}
+
 export function matchQuery(name, q) {
   const n = fold(name);
   return fold(q).split(/\s+/).filter(Boolean).every(w => n.includes(w));
@@ -169,7 +175,7 @@ export function channelView(state, meta, ch, ym, asOf, today = asOf) {
   };
 }
 
-export function buildCards(state, meta, ym, asOf, today = asOf) {
+export function buildCards(state, meta, ym, asOf, today = asOf, names = null) {
   return state.structures.map(s => {
     const channels = s.channels.map(ch => channelView(state, meta, ch, ym, asOf, today)).filter(Boolean);
     // I 7 giorni guardano anche a fine mese precedente: si usa il giornaliero completo, non solo il mese scelto.
@@ -189,9 +195,11 @@ export function buildCards(state, meta, ym, asOf, today = asOf) {
     // proposte in giallo da confermare nel mese scelto o in quello dopo: vanno decise prima che il mese parta
     const soon = [ym, nextMonth(ym)];
     const proposals = soon.filter(y => s.channels.some(ch => ch.months.some(m => m.ym === y && m.proposal)));
+    const real = structureName(names, s.tab);
     return {
       tab: s.tab,
-      name: s.tab,
+      name: real.name,
+      place: real.place,
       overall,
       channels,
       proposals,
@@ -430,7 +438,7 @@ export function updateDates(meta, state) {
 }
 
 // Report mensile per il cliente: solo speso del mese, programmato del mese dopo, speso sul totale del piano.
-export function buildReport(state, meta, tab, ym, asOf, today = asOf) {
+export function buildReport(state, meta, tab, ym, asOf, today = asOf, names = null) {
   const d = buildDetail(state, meta, tab, ym, asOf, null, today);
   const k = d.plan.findIndex(p => p.ym === ym);
   const row = d.plan[k];
@@ -446,7 +454,7 @@ export function buildReport(state, meta, tab, ym, asOf, today = asOf) {
   }
   const t = planTotals(d.plan, ym);
   return {
-    tab, asOf, from: t.from, to: t.to,
+    tab, ...structureName(names, tab), asOf, from: t.from, to: t.to,
     month: { ym, programmed: sum(row, c => c.programmed), spent: sum(row, c => c.spent), inProgress: ym >= today.slice(0, 7) },
     next,
     total: t.total,
