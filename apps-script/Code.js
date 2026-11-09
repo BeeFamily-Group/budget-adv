@@ -286,11 +286,19 @@ var USER_ACTIONS = {
     return { ok: true };
   },
 
+  // Una riga per blocco e mese (lo script Google Ads di Marco scrive ogni notte): si aggiorna quella del mese,
+  // a meno che non ci sia già un dato con una data più recente (resta quello).
   saveGoogle: function (role, b) {
     var loc = locateChecked(b.channel_id, b.title);
     if (role !== 'marco' || loc.block.kind !== 'google') return { ok: false, error: 'forbidden' };
-    SpreadsheetApp.getActive().getSheetByName('GOOGLE').appendRow(
-      [nowIso(), b.channel_id, "'" + b.date, Number(b.spent_mtd), Number(b.leads_mtd || 0), Number(b.daily_budget || 0), Boolean(b.active), role]);
+    var day = function (v) { return String(v).replace(/^'/, '').slice(0, 10); };
+    var last = rows('GOOGLE').filter(function (r) { return r.channel_id === b.channel_id && day(r.date).slice(0, 7) === day(b.date).slice(0, 7); })
+      .sort(function (x, y) { return day(x.date).localeCompare(day(y.date)); }).pop();
+    if (last && day(last.date) > day(b.date)) return { ok: true, sheet: 'già presente un dato più recente' };
+    var values = [nowIso(), b.channel_id, "'" + b.date, Number(b.spent_mtd), Number(b.leads_mtd || 0), Number(b.daily_budget || 0), Boolean(b.active), role];
+    var sh = SpreadsheetApp.getActive().getSheetByName('GOOGLE');
+    if (last) sh.getRange(last._row, 1, 1, values.length).setValues([values]);
+    else sh.appendRow(values);
     var res = writeSpendCell(role, 'saveGoogle', b.channel_id, b.title, String(b.date).slice(0, 7), b.spent_mtd);
     return { ok: true, sheet: res.skipped || 'aggiornato' };
   },

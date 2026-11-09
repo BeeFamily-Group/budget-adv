@@ -33,6 +33,7 @@ class FakeSheet {
       setBackground: function (v) { sh.cell(r, c); sh.bg[r - 1][c - 1] = v; return this; },
       getBackground: () => { sh.cell(r, c); return sh.bg[r - 1][c - 1]; },
       getValues: () => grid((i, j) => sh.values[i][j]),
+      setValues: function (vals) { vals.forEach((row, i) => row.forEach((v, j) => { sh.cell(r + i, c + j); sh.values[r + i - 1][c + j - 1] = v; })); return this; },
       getBackgrounds: () => grid((i, j) => sh.bg[i][j]),
       getA1Notation: () => `${letter(c)}${r}`,
     };
@@ -47,6 +48,7 @@ function setupApp() {
     NOTE: new FakeSheet('NOTE', head(['ts', 'tab', 'ym', 'author', 'text'])),
     GIORNI: new FakeSheet('GIORNI', head(['channel_id', 'ym', 'start_day'])),
     LOG: new FakeSheet('LOG', head(['ts', 'who', 'action', 'cell', 'before', 'after'])),
+    GOOGLE: new FakeSheet('GOOGLE', head(['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author'])),
   };
   const ctx = {
     SpreadsheetApp: { getActive: () => ({ getSheetByName: (n) => sheets[n] || null, getSheets: () => Object.values(sheets) }) },
@@ -122,4 +124,21 @@ test('web app: il titolare che riscrive la cifra toglie il giallo come prima', (
   assert.deepEqual(plain(app.USER_ACTIONS.savePlan('francesco', { ...META, ym: '2026-12', eur: 140 })), { ok: true });
   assert.equal(sheets.Ciccio.getRange(DEC, 3).getBackground(), null);
   assert.equal(sheets.Ciccio.getRange(DEC, 3).getValue(), 140);
+});
+
+const G = { channel_id: 'Ciccio|J', title: 'BUDGET GOOGLE ADS' };
+const googleRows = (sheets) => sheets.GOOGLE.values.slice(1).map(r => [r[1], r[2], r[3]]);
+
+test('web app: numeri Google, una riga per blocco e mese (lo script li manda ogni notte)', () => {
+  const { app, sheets } = setupApp();
+  const send = (date, spent) => app.USER_ACTIONS.saveGoogle('marco', { ...G, date, spent_mtd: spent, leads_mtd: 3, daily_budget: 40, active: true });
+  assert.equal(send('2026-11-07', 300).ok, true);
+  assert.equal(send('2026-11-08', 340).ok, true);           // stesso mese: aggiorna la riga
+  assert.deepEqual(plain(googleRows(sheets)), [['Ciccio|J', "'2026-11-08", 340]]);
+  assert.equal(send('2026-10-31', 1380).ok, true);          // altro mese: riga nuova
+  assert.equal(sheets.GOOGLE.values.length, 3);
+  const old = send('2026-11-05', 200);                       // dato più vecchio di quello salvato: resta il più recente
+  assert.equal(old.ok, true);
+  assert.equal(old.sheet, 'già presente un dato più recente');
+  assert.deepEqual(plain(googleRows(sheets))[0], ['Ciccio|J', "'2026-11-08", 340]);
 });
