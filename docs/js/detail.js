@@ -1,5 +1,5 @@
 // Dettaglio di una struttura: canali, risultati, piano mese per mese, chiusura, anno precedente. Le richieste stanno su Asana.
-import { buildDetail, buildReport, prevYearMonths, updateDates, channelLabel, stateLabel, channelView, applyFrom, staleText, trendDaily } from './viewmodel.js';
+import { buildDetail, buildReport, prevYearMonths, updateDates, updateLineHtml, channelLabel, stateLabel, channelView, applyFrom, staleText, trendDaily } from './viewmodel.js';
 import { fmtEur, parseEur } from './calc.js';
 import { store, esc, ddmm, monthShort, monthLong, kpiHtml, barHtml, reload, render as renderHome } from './app.js';
 import { post } from './api.js';
@@ -185,8 +185,6 @@ function proposalTitle(p, c) {
   return n ? `${n.text} (Ambra, ${ddmm(String(n.ts).slice(0, 10))})` : 'proposta da confermare';
 }
 
-const updLine = (u) => `Meta ${u.meta ? `al ${ddmm(u.meta)}` : '—'} (automatico) · Google ${u.google ? `al ${ddmm(u.google)}` : '—'} (manuale)`;
-
 function resultsBox(d) {
   const m = d.results.month;
   const cpl = (sp, l) => (l > 0 ? eur2(sp / l) : '—');
@@ -288,7 +286,7 @@ function paint() {
         <button type="button" data-act="nextMonth" aria-label="Mese dopo"${i >= list.length - 1 ? ' disabled' : ''}>${icon('chevronRight', 16)}</button></div>
       ${ro}</div>
     <div class="detail-body">
-      <header class="dh"><div><h1>${esc(currentTab)}</h1><p class="sub">${monthLong(store.ym)} · ${updLine(updateDates(store.meta, store.state))}</p></div>
+      <header class="dh"><div><h1>${esc(currentTab)}</h1><p class="sub">${monthLong(store.ym)} · ${updateLineHtml(updateDates(store.meta, store.state))}</p></div>
         <button class="btn report-btn" type="button" data-act="report" title="PDF per il cliente: speso del mese, programmato del mese dopo, speso sul totale">${icon('download', 15)}Report di ${monthShort(store.ym)}</button></header>
       ${tilesHtml(d)}
       ${totalBox(d)}

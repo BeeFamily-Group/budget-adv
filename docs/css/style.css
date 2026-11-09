@@ -57,11 +57,6 @@ table, .num, .kpi .v, .ch-num, .tiles .v { font-variant-numeric: tabular-nums; }
 .brand-name { font: 700 16px/1 var(--display); color: #fff; letter-spacing: -0.01em; }
 .brand-name small { margin-left: 6px; font: 500 12px/1 var(--sans); color: var(--night-muted); letter-spacing: 0; }
 .top-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.fresh { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--night-ink); white-space: nowrap; min-width: 0; }
-.upd { display: inline-flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
-.upd b { color: #fff; font-weight: 600; }
-.upd em { font-style: normal; color: var(--night-muted); }
-.upd.tag { color: var(--yel); text-transform: uppercase; font-size: 11px; font-weight: 600; letter-spacing: .04em; }
 .who { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--yel); background: var(--yel); color: var(--night); border-radius: 999px;
   padding: 6px 14px; font-size: 13px; font-weight: 600; white-space: nowrap; transition: background .15s, border-color .15s, color .15s; }
 .who:hover { background: var(--yel-hover); border-color: var(--yel-hover); }
@@ -229,6 +224,7 @@ table.t tbody tr:hover td { background: #f6f8fb; }
 .ro { display: inline-flex; align-items: center; gap: 5px; background: rgba(255, 196, 0, .14); color: var(--yel); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; }
 .detail-body { max-width: 1080px; margin: 0 auto; padding: 24px 24px 72px; }
 .dh { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.dh .sub b { color: var(--ink); font-weight: 700; }
 .dh h1 { margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.025em; }
 .total-box { margin-top: 0; }
 .bar i.total { background: var(--navy); }
@@ -341,8 +337,6 @@ textarea:focus { outline: 0; border-color: var(--focus); box-shadow: 0 0 0 3px v
 }
 @media (max-width: 640px) {
   .topbar, .detail-head { padding: 8px 16px; }
-  .fresh { flex-direction: column; align-items: flex-end; gap: 1px; font-size: 11px; }
-  .upd.tag { display: none; }
   .page { padding: 20px 16px 48px; }
   .page-head h1 { font-size: 24px; }
   .search { flex: 1 1 100%; }

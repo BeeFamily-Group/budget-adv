@@ -1,10 +1,9 @@
 // Schermata principale: ricerca, mesi, andamento, schede per struttura, campagne da assegnare.
-import { getState, getMeta, getStorico, isDemo } from './api.js';
-import { buildCards, channelLabel, stateLabel, staleAccounts, staleText, macLate, trendDaily, matchQuery, updateDates } from './viewmodel.js';
+import { getState, getMeta, getStorico } from './api.js';
+import { buildCards, channelLabel, stateLabel, staleAccounts, staleText, macLate, trendDaily, matchQuery } from './viewmodel.js';
 import { fmtEur } from './calc.js';
 import { icon } from './icons.js';
 import { mountTrend } from './trend.js';
-import { SHEET_LABEL } from '../config.js';
 
 export const store = { state: null, meta: null, storico: null, ym: null, asOf: null, today: null, q: '', onlyOff: false, role: null, code: null };
 
@@ -65,14 +64,6 @@ function cardHtml(card) {
     </button>`;
 }
 
-// In alto a destra solo le date di aggiornamento: Meta automatico (notte), Google manuale (Marco).
-export function freshnessHtml(dates) {
-  const tag = isDemo() ? 'dati di prova' : SHEET_LABEL;
-  return `<span class="upd"><b>Meta</b> ${dates.meta ? ddmm(dates.meta) : '—'} <em>automatico</em></span>`
-    + `<span class="upd"><b>Google</b> ${dates.google ? ddmm(dates.google) : '—'} <em>manuale</em></span>`
-    + (tag ? `<span class="upd tag">${esc(tag)}</span>` : '');
-}
-
 function bannersHtml(state, meta) {
   const out = [];
   const late = macLate(meta.as_of, store.today);
@@ -95,7 +86,6 @@ export function render() {
   const yms = state.structures[0]?.channels[0]?.months.map(m => m.ym) || [];
   const nowYm = (store.today || asOf).slice(0, 7);
   $('months').innerHTML = yms.map(y => `<button type="button" data-ym="${y}" aria-pressed="${y === ym}"${y === nowYm ? ' class="now" title="mese in corso"' : ''}>${monthShort(y)}</button>`).join('');
-  $('freshness').innerHTML = freshnessHtml(updateDates(store.meta, state));
   $('banners').innerHTML = bannersHtml(state, meta);
 
   const cards = buildCards(state, meta, ym, asOf, store.today);
@@ -168,7 +158,7 @@ function init() {
   document.body.classList.add('first-paint');
   reload()
     .then(() => { setTimeout(() => document.body.classList.remove('first-paint'), 700); return import('./auth.js').then(m => m.restore()); })
-    .catch((e) => { $('freshness').textContent = `Errore nel caricamento: ${e.message}`; $('count').textContent = 'Dati non disponibili: riprova tra poco.'; });
+    .catch((e) => { console.error(e); $('count').textContent = `Dati non disponibili (${e.message}): riprova tra poco.`; });
 }
 
 init();

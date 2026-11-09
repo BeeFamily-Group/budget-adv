@@ -409,7 +409,7 @@ test('report dell\'ultimo mese del piano: nessun mese dopo', () => {
   assert.equal(buildReport(withReq, meta, 'Ciccio', '2027-12', '2026-11-14', '2026-11-14').next, null);
 });
 
-import { prevYearMonths, updateDates } from '../docs/js/viewmodel.js';
+import { prevYearMonths, updateDates, updateLineHtml } from '../docs/js/viewmodel.js';
 
 test('anno precedente da gennaio a dicembre: vecchio foglio fino a settembre, poi il piano', () => {
   const storico = { tabs: { Ciccio: {
@@ -440,4 +440,11 @@ test('anno precedente da gennaio a dicembre: vecchio foglio fino a settembre, po
 test('date di aggiornamento: Meta automatico, Google dall\'ultimo inserimento di Marco', () => {
   assert.deepEqual(updateDates({ as_of: '2026-11-08' }, state), { meta: '2026-11-08', google: '2026-11-12' });
   assert.deepEqual(updateDates({ as_of: null }, { ...state, google: [] }), { meta: null, google: null });
+});
+
+test('riga delle date sotto il nome: ultimo aggiornamento in grassetto', () => {
+  assert.equal(updateLineHtml({ meta: '2026-11-08', google: '2026-11-05' }),
+    'Meta aggiornato al <b>08/11/2026</b> (automatico) · Google aggiornato al <b>05/11/2026</b> (manuale)');
+  assert.equal(updateLineHtml({ meta: '2026-11-08', google: null }),
+    'Meta aggiornato al <b>08/11/2026</b> (automatico) · Google non ancora inserito da Marco (manuale)');
 });

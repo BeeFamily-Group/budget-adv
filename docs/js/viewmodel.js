@@ -414,7 +414,16 @@ export function prevYearMonths(storico, structure, plan, nowYm) {
     status: r.status, programmed: r.programmed }));
 }
 
-// Date di aggiornamento in alto: Meta dalla lettura automatica della notte, Google dall'ultimo inserimento di Marco.
+// Date di aggiornamento: Meta dalla lettura automatica della notte, Google dall'ultimo inserimento di Marco.
+const dmyOf = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+
+// Riga sotto il nome della struttura: data dell'ultimo aggiornamento in grassetto per ciascuna fonte.
+export function updateLineHtml(u) {
+  const meta = u.meta ? `Meta aggiornato al <b>${dmyOf(u.meta)}</b> (automatico)` : 'Meta non ancora letto (automatico)';
+  const google = u.google ? `Google aggiornato al <b>${dmyOf(u.google)}</b> (manuale)` : 'Google non ancora inserito da Marco (manuale)';
+  return `${meta} · ${google}`;
+}
+
 export function updateDates(meta, state) {
   const dates = (state.google || []).map(g => String(g.date || '').slice(0, 10)).filter(Boolean).sort();
   return { meta: (meta && meta.as_of) || null, google: dates.length ? dates[dates.length - 1] : null };
