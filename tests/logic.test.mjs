@@ -196,3 +196,32 @@ test('scrittura in blocco del piano: motivo, canale, titolo e regole del savePla
   assert.match(L.validatePlanBatch({ reason: 'x', items: [ok.items[0], { ...ok.items[1], start_day: 40 }] }), /voce 2/);
   assert.match(L.validatePlanBatch({ reason: 'x', items: Array(401).fill(ok.items[0]) }), /troppe voci/);
 });
+
+test('chi scrive il piano: titolare del canale o proposta di Ambra sui mesi futuri', () => {
+  assert.equal(L.planWriteMode('francesco', 'meta', '2026-12', '2026-11'), 'owner');
+  assert.equal(L.planWriteMode('marco', 'google', '2026-11', '2026-11'), 'owner');
+  assert.equal(L.planWriteMode('francesco', 'google', '2026-12', '2026-11'), null);
+  assert.equal(L.planWriteMode('ambra', 'meta', '2026-12', '2026-11'), 'proposal');
+  assert.equal(L.planWriteMode('ambra', 'google', '2027-03', '2026-11'), 'proposal');
+  assert.equal(L.planWriteMode('ambra', 'meta', '2026-11', '2026-11'), null);   // mese in corso: si usa la nota
+  assert.equal(L.planWriteMode('ambra', 'meta', '2026-10', '2026-11'), null);
+  assert.equal(L.planWriteMode(null, 'meta', '2026-12', '2026-11'), null);
+});
+
+test('nota automatica della proposta: canale, prima e dopo', () => {
+  const was = { eur: 25, days: 31, start_day: 1 };
+  assert.equal(L.proposalNote('BUDGET FACEBOOK ADS', was, { eur: 30 }), 'Proposta Meta: 25 → 30 €/g');
+  assert.equal(L.proposalNote('BUDGET FACEBOOK ADS ESTERO', was, { eur: 30 }), 'Proposta Meta estero: 25 → 30 €/g');
+  assert.equal(L.proposalNote('BUDGET GOOGLE ADS', was, { days: 15, start_day: 16 }), 'Proposta Google: giorni 31 → 15, dal 16');
+  assert.equal(L.proposalNote('BUDGET FACEBOOK ADS', was, { eur: 30, days: 15, start_day: 16 }),
+               'Proposta Meta: 25 → 30 €/g, giorni 31 → 15, dal 16');
+  assert.equal(L.proposalNote('BUDGET FACEBOOK ADS', { eur: null, days: 31, start_day: 1 }, { eur: 30 }), 'Proposta Meta: — → 30 €/g');
+  assert.equal(L.proposalNote('BUDGET FACEBOOK ADS', was, { eur: 25, days: 31 }), '');
+});
+
+test('conferma di una proposta: mese e €/giorno visti da chi conferma', () => {
+  assert.equal(L.validatePayload('confirmPlan', { ym: '2027-01', eur: 30 }), '');
+  assert.equal(L.validatePayload('confirmPlan', { ym: '2027-01', eur: 0 }), '');
+  assert.equal(L.validatePayload('confirmPlan', { ym: '2027-01' }), '€/giorno non valido');
+  assert.equal(L.validatePayload('confirmPlan', { ym: '2027-13', eur: 30 }), 'mese non valido');
+});

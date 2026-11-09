@@ -119,6 +119,35 @@ function canWriteNote(role, author) {
   return Boolean(role) && role === author;
 }
 
+// Chi scrive il piano di un mese: il titolare del canale ('owner'), oppure Ambra come proposta in giallo
+// ('proposal'), solo sui mesi dopo quello in corso: sul mese in corso Ambra usa la nota. Altrimenti null.
+function planWriteMode(role, kind, ym, nowYm) {
+  if (canEditChannel(role, kind)) return 'owner';
+  if (role === 'ambra' && String(ym) > String(nowYm)) return 'proposal';
+  return null;
+}
+
+// Stessa etichetta della pagina (viewmodel.js channelLabel): serve alla nota automatica della proposta.
+function channelShort(title) {
+  var t = String(title).toUpperCase();
+  var base = t.indexOf('FACEBOOK') !== -1 ? 'Meta' : 'Google';
+  var tags = [['ITALIA', 'Italia'], ['ESTERO', 'estero'], ['GAS', 'GAS'], ['VILLE', 'ville'], ['BARCA', 'barca']];
+  for (var i = 0; i < tags.length; i++) if (t.indexOf(tags[i][0]) !== -1) return base + ' ' + tags[i][1];
+  return base;
+}
+
+// Testo della nota che accompagna una proposta di Ambra: solo cio' che cambia, con il valore di prima.
+function proposalNote(title, before, after) {
+  var parts = [];
+  var show = function (v) { return v === null || v === undefined || v === '' ? '—' : String(v); };
+  if (given(after.eur) && Number(after.eur) !== Number(before.eur === null ? NaN : before.eur)) {
+    parts.push(show(before.eur) + ' → ' + Number(after.eur) + ' €/g');
+  }
+  if (given(after.days) && Number(after.days) !== Number(before.days)) parts.push('giorni ' + show(before.days) + ' → ' + Number(after.days));
+  if (given(after.start_day) && Number(after.start_day) !== Number(before.start_day || 1)) parts.push('dal ' + Number(after.start_day));
+  return parts.length ? 'Proposta ' + channelShort(title) + ': ' + parts.join(', ') : '';
+}
+
 // La routine scrive la Spesa Effettiva solo se la cella e' vuota o contiene l'ultimo valore scritto da lei.
 function spendWritable(cellValue, lastRoutineValue) {
   if (cellValue === '' || cellValue === null || cellValue === undefined) return true;
@@ -230,6 +259,10 @@ function validatePayload(action, b) {
     if (given(b.days) && !isIntIn(b.days, 0, 31)) return 'giorni non validi (da 0 a 31)';
     if (given(b.start_day) && !isIntIn(b.start_day, 1, 31)) return 'dal giorno non valido (da 1 a 31)';
   }
+  if (action === 'confirmPlan') {
+    if (!YM_RE.test(String(b.ym))) return 'mese non valido';
+    if (!isAmount(b.eur)) return '€/giorno non valido';
+  }
   if (action === 'saveGoogle') {
     if (!DATE_RE.test(String(b.date))) return 'data non valida';
     if (!isAmount(b.spent_mtd)) return 'speso del mese non valido';
@@ -261,7 +294,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     LAYOUT: LAYOUT, monthsList: monthsList, monthLabel: monthLabel, colLetter: colLetter,
     findBlocks: findBlocks, readMonths: readMonths, readPrevYear: readPrevYear, channelId: channelId, planCell: planCell,
-    roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote,
+    roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote, planWriteMode: planWriteMode, proposalNote: proposalNote,
     spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, validatePlanBatch: validatePlanBatch, titleMismatch: titleMismatch, dueRequests: dueRequests, expiredRequests: expiredRequests, resultStatus: resultStatus,
     chunkText: chunkText, bootstrapClosed: bootstrapClosed, ymOf: ymOf,
   };

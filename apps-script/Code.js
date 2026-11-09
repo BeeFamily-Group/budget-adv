@@ -234,6 +234,25 @@ function writePlanCells(who, action, loc, b, giorniRows) {
   }
 }
 
+// Proposta di Ambra su un mese futuro: valori scritti come un savePlan, cella del €/giorno in giallo
+// (anche se cambiano solo i giorni) e nota automatica con prima e dopo, visibile sotto il mese.
+function writeProposal(role, loc, b) {
+  var cell = planCell(loc.values, loc.block.col, b.ym);
+  var eurRange = loc.sheet.getRange(cell.row, cell.colEur);
+  var giorni = rows('GIORNI').filter(function (r) { return r.channel_id === b.channel_id && r.ym === b.ym; })[0];
+  var before = {
+    eur: num(eurRange.getValue()),
+    days: num(loc.sheet.getRange(cell.row, cell.colDays).getValue()),
+    start_day: giorni ? num(giorni.start_day) : 1,
+  };
+  var text = proposalNote(loc.block.title, before, b);
+  if (!text) return { ok: true, unchanged: true };
+  writePlanCells(role, 'proposePlan', loc, b, null);
+  eurRange.setBackground(PROPOSAL_BG);
+  SpreadsheetApp.getActive().getSheetByName('NOTE').appendRow([nowIso(), loc.sheet.getName(), "'" + b.ym, role, "'" + text]);
+  return { ok: true, proposal: true };
+}
+
 var USER_ACTIONS = {
   whoami: function (role) { return { ok: true, role: role }; },
 
@@ -245,8 +264,25 @@ var USER_ACTIONS = {
 
   savePlan: function (role, b) {
     var loc = locateChecked(b.channel_id, b.title);
-    if (!canEditChannel(role, loc.block.kind)) return { ok: false, error: 'forbidden' };
+    var mode = planWriteMode(role, loc.block.kind, b.ym, todayRome().slice(0, 7));
+    if (!mode) {
+      return { ok: false, error: role === 'ambra' ? 'si possono proporre solo i mesi dopo quello in corso: per questo mese usa la nota' : 'forbidden' };
+    }
+    if (mode === 'proposal') return writeProposal(role, loc, b);
     writePlanCells(role, 'savePlan', loc, b, null);
+    return { ok: true };
+  },
+
+  // Francesco (Meta) o Marco (Google) confermano la proposta in giallo: il valore resta, il giallo va via.
+  // Se nel frattempo la proposta e' cambiata, non si conferma niente.
+  confirmPlan: function (role, b) {
+    var loc = locateChecked(b.channel_id, b.title);
+    if (!canEditChannel(role, loc.block.kind)) return { ok: false, error: 'forbidden' };
+    var cell = planCell(loc.values, loc.block.col, b.ym);
+    var range = loc.sheet.getRange(cell.row, cell.colEur);
+    if ((num(range.getValue()) || 0) !== Number(b.eur)) return { ok: false, error: 'la proposta è cambiata nel frattempo: ricarica la pagina' };
+    log(role, 'confirmPlan', loc.sheet.getName() + '!' + range.getA1Notation(), 'proposta', Number(b.eur));
+    range.setBackground(null);
     return { ok: true };
   },
 

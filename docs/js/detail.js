@@ -239,25 +239,30 @@ function planBox(d) {
     const rowCls = p.ym === nowYm ? 'cur' : (p.ym > nowYm ? 'future' : 'past');
     const cells = p.channels.map((c, k) => {
       const mine = (c.kind === 'meta' && d.can.editMeta) || (c.kind === 'google' && d.can.editGoogle);
+      const canWrite = (editable && mine) || (d.can.propose && p.ym > nowYm);   // Ambra: solo proposte sui mesi dopo quello in corso
       const val = c.eur ?? '';
-      const input = editable && mine
+      const input = canWrite
         ? `<input class="edit${c.proposal ? ' proposal' : ''}" data-act="plan" data-id="${esc(c.id)}" data-ym="${p.ym}" data-old="${val}" value="${val}" inputmode="decimal" aria-label="${esc(channelLabel(c.title))} €/giorno ${monthShort(p.ym)}">`
         : (val === '' ? '<span class="dash">—</span>' : `<span${c.proposal ? ' class="prop" title="proposta da confermare"' : ''}>${fmtEur(val)}</span>`);
+      const confirm = editable && mine && c.proposal && val !== ''
+        ? `<button class="confirm-btn" type="button" data-act="confirm" data-id="${esc(c.id)}" data-ym="${p.ym}" data-eur="${val}" aria-label="Conferma ${esc(channelLabel(c.title))} ${monthShort(p.ym)} a ${fmtEur(val)} al giorno">${icon('check', 12)}Conferma</button>` : '';
       const partial = c.win.days < c.win.daysInMonth || c.win.startDay !== 1;
-      const days = editable && mine
+      const days = canWrite
         ? `<button class="days-btn" type="button" data-act="days" data-id="${esc(c.id)}" data-ym="${p.ym}" aria-label="Giorni attivi ${esc(channelLabel(c.title))} ${monthShort(p.ym)}">${daysLabel(c.win)}</button>`
         : (partial ? `<span class="days-txt">${daysLabel(c.win)}</span>` : '');
       const spent = c.spent === null ? '<span class="dash">—</span>'
         : `<span class="spent">${fmtEur(c.spent)}</span>${c.spentPct === null ? '' : `<span class="pct ${pctTone(c, p.ym, nowYm)}">${c.spentPct}%</span>`}`;
-      return `<td${k ? ' class="sep"' : ''}>${input}${days}</td><td>${c.programmed ? fmtEur(c.programmed) : '<span class="dash">—</span>'}</td><td>${spent}</td>`;
+      return `<td${k ? ' class="sep"' : ''}>${input}${confirm}${days}</td><td>${c.programmed ? fmtEur(c.programmed) : '<span class="dash">—</span>'}</td><td>${spent}</td>`;
     }).join('');
     const status = p.channels.map(c => c.requestStatus).filter(Boolean).join(' · ');
     return `<tr class="${rowCls}${p.notes.length ? ' has-notes' : ''}"><td><span class="mname">${monthShort(p.ym)}</span>${noteAddBtn(p.ym)}</td>${cells}<td class="status">${esc(status)}</td></tr>`
       + planNotesRow(p, 2 + p.channels.length * 3, rowCls);
   }).join('');
   const how = d.can.editMeta || d.can.editGoogle
-    ? `Modifica il €/giorno e premi Invio, oppure tocca i giorni: va nello Sheet${d.can.editMeta ? ' e, per Meta, anche sulle campagne (mese in corso al prossimo giro orario, mesi futuri dal primo giorno attivo)' : ''}.`
-    : 'Speso: Meta dai dati giornalieri, Google dai numeri di Marco; per i mesi più vecchi vale la Spesa Effettiva dello Sheet.';
+    ? `Modifica il €/giorno e premi Invio, oppure tocca i giorni: va nello Sheet${d.can.editMeta ? ' e, per Meta, anche sulle campagne (mese in corso al prossimo giro orario, mesi futuri dal primo giorno attivo)' : ''}. Le proposte in giallo si accettano con «Conferma» o scrivendo un altro valore.`
+    : d.can.propose
+      ? 'Sui mesi dopo quello in corso puoi proporre €/giorno (Invio per salvare) e giorni: restano in giallo finché Francesco (Meta) o Marco (Google) non confermano, e solo allora arrivano alle campagne. Per il mese in corso usa la nota.'
+      : 'Speso: Meta dai dati giornalieri, Google dai numeri di Marco; per i mesi più vecchi vale la Spesa Effettiva dello Sheet.';
   return `<div class="box"><div class="box-head"><div><h2>Piano mese per mese</h2><p class="small">${how}</p></div></div>
       <div class="legend-row"><span><i class="prop" style="width:16px;height:12px;padding:0"></i>proposta da confermare</span><span>% = speso sul programmato · colorata a mese chiuso</span></div>
       <div class="scroll-x"><table class="t plan"><thead><tr><th rowspan="2">Mese</th>${head1}<th rowspan="2" class="status-h">Stato</th></tr><tr>${head2}</tr></thead>
@@ -307,7 +312,7 @@ function paint() {
   const d = buildDetail(store.state, store.meta, currentTab, store.ym, store.asOf, store.role, todayRome());
   const list = yms();
   const i = list.indexOf(store.ym);
-  const ro = store.role === 'ambra' ? `<span class="ro">${icon('lock', 13)}Sola lettura</span>` : '';
+  const ro = store.role === 'ambra' ? `<span class="ro">Proposte sui mesi futuri</span>` : '';
   $d().innerHTML = `<div class="detail-head">
       <button class="back" type="button" data-act="back">${icon('arrowLeft', 16)}Strutture</button>
       <span class="crumbs">Strutture › <b>${esc(currentTab)}</b></span>
@@ -391,9 +396,9 @@ async function onClick(e) {
         if (change) {
           const r = await post('savePlan', { channel_id: c.id, title: titleOf(c.id), ym: b.dataset.ym, ...change }, store.code);
           if (!r.ok) { toast(`Non salvato: ${r.error}`); return; }
-          msg = 'Giorni salvati nello Sheet.';
+          msg = r.proposal ? 'Proposta salvata: resta in giallo finché non viene confermata.' : (r.unchanged ? 'Nessuna modifica.' : 'Giorni salvati nello Sheet.');
         }
-        if (c.openRequest) {   // la richiesta Meta del mese riparte dal nuovo primo giorno attivo
+        if (c.openRequest && store.role === 'francesco') {   // la richiesta Meta del mese riparte dal nuovo primo giorno attivo
           await reload();
           const q = await sendMetaRequest(c.id, b.dataset.ym, Number(c.openRequest.eur),
             { current: Number(c.openRequest.current_budget || 0), big: true });
@@ -425,6 +430,20 @@ async function onClick(e) {
         toast(`Report non creato: ${err.message}`);
       }
     }
+    if (b.dataset.act === 'confirm') {
+      const eur = Number(b.dataset.eur);
+      const meta = channelOf(b.dataset.id).kind === 'meta';
+      const check = meta ? await metaCheck(b.dataset.id, eur) : null;
+      if (meta && !check) return;   // annullato: nulla è stato scritto
+      const r = await post('confirmPlan', { channel_id: b.dataset.id, title: titleOf(b.dataset.id), ym: b.dataset.ym, eur }, store.code);
+      if (!r.ok) { toast(`Non confermata: ${r.error}`); return; }
+      if (meta) {
+        const q = await sendMetaRequest(b.dataset.id, b.dataset.ym, eur, check);
+        await refreshAfter(q.ok ? `Proposta confermata e richiesta Meta creata per ${monthShort(b.dataset.ym)}.` : `Proposta confermata; richiesta Meta non creata (${q.error}).`);
+      } else {
+        await refreshAfter('Proposta confermata nello Sheet.');
+      }
+    }
     if (b.dataset.act === 'lowerPlan') {
       const r = await post('savePlan', { channel_id: b.dataset.id, title: titleOf(b.dataset.id), ym: store.ym, eur: Number(b.dataset.eur) }, store.code);
       if (r.ok) await refreshAfter('Piano aggiornato nello Sheet.'); else toast(`Non salvato: ${r.error}`);
@@ -440,6 +459,13 @@ async function onKey(e) {
   if (!(eur >= 0)) { toast('Importo non valido: scrivi per esempio 120 oppure 1.200'); return; }
   if (String(eur) === i.dataset.old) return;
   const ch = channelOf(i.dataset.id);
+  if (store.role === 'ambra') {
+    i.disabled = true;
+    const r = await post('savePlan', { channel_id: i.dataset.id, title: titleOf(i.dataset.id), ym: i.dataset.ym, eur }, store.code);
+    if (!r.ok) { toast(`Non salvata: ${r.error}`); i.disabled = false; return; }
+    await refreshAfter(`Proposta salvata: resta in giallo finché ${ch.kind === 'meta' ? 'Francesco' : 'Marco'} non la conferma.`);
+    return;
+  }
   const check = ch.kind === 'meta' ? await metaCheck(i.dataset.id, eur) : null;
   if (ch.kind === 'meta' && !check) { i.value = i.dataset.old; return; }   // annullato: nulla è stato scritto
   i.disabled = true;

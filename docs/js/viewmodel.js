@@ -186,11 +186,15 @@ export function buildCards(state, meta, ym, asOf, today = asOf) {
     }
     const hasMeta = s.channels.some(c => c.kind === 'meta');
     const overall = channels.reduce((acc, c) => (RANK[c.state] > RANK[acc] ? c.state : acc), 'none');
+    // proposte in giallo da confermare nel mese scelto o in quello dopo: vanno decise prima che il mese parta
+    const soon = [ym, nextMonth(ym)];
+    const proposals = soon.filter(y => s.channels.some(ch => ch.months.some(m => m.ym === y && m.proposal)));
     return {
       tab: s.tab,
       name: s.tab,
       overall,
       channels,
+      proposals,
       kpi7: hasMeta ? kpis7([...allDaily.values()], asOf) : null,
     };
   });
@@ -245,6 +249,11 @@ function requestStatus(state, channelId, ym) {
 function prevMonth(ym) {
   const [y, m] = ym.split('-').map(Number);
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+}
+
+function nextMonth(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
 }
 
 export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
@@ -328,7 +337,7 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
     totals: planTotals(plan),
     prev: prevYearTotals(s),
     results:{ month: { meta: metaM, google: googleM, total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf, today)[0].kpi7 },
-    can: { editMeta: role === 'francesco', editGoogle: role === 'marco', note: Boolean(role) },
+    can: { editMeta: role === 'francesco', editGoogle: role === 'marco', note: Boolean(role), propose: role === 'ambra' },
   };
 }
 

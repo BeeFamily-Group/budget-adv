@@ -104,11 +104,19 @@ test('dettaglio: chiusura del mese precedente', () => {
 
 test('dettaglio: permessi per ruolo', () => {
   assert.deepEqual(buildDetail(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', 'ambra').can,
-                   { editMeta: false, editGoogle: false, note: true });
+                   { editMeta: false, editGoogle: false, note: true, propose: true });
   assert.deepEqual(buildDetail(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', 'marco').can,
-                   { editMeta: false, editGoogle: true, note: true });
+                   { editMeta: false, editGoogle: true, note: true, propose: false });
   assert.deepEqual(buildDetail(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', null).can,
-                   { editMeta: false, editGoogle: false, note: false });
+                   { editMeta: false, editGoogle: false, note: false, propose: false });
+});
+
+test('home: proposte da confermare nel mese scelto e in quello dopo', () => {
+  // nel fixture Ciccio Meta ha gennaio 2027 in giallo, dicembre no
+  const dec = buildCards(state, meta, '2026-12', '2026-11-14').find(c => c.tab === 'Ciccio');
+  assert.deepEqual(dec.proposals, ['2027-01']);
+  const nov = buildCards(state, meta, '2026-11', '2026-11-14').find(c => c.tab === 'Ciccio');
+  assert.deepEqual(nov.proposals, []);
 });
 
 test('dettaglio: stato della richiesta Meta nel piano', () => {

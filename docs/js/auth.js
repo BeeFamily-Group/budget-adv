@@ -3,7 +3,7 @@ import { post } from './api.js';
 import { store, render, esc } from './app.js';
 
 const KEY = 'budget-adv-code';
-const LABEL = { francesco: 'Francesco · Meta', marco: 'Marco · Google', ambra: 'Ambra · lettura' };
+const LABEL = { francesco: 'Francesco · Meta', marco: 'Marco · Google', ambra: 'Ambra · proposte' };
 
 function saved() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }
 function save(code) { try { code ? localStorage.setItem(KEY, code) : localStorage.removeItem(KEY); } catch { /* niente */ } }

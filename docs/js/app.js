@@ -61,6 +61,7 @@ function cardHtml(card) {
   const chip = main ? `<span class="chip ${card.overall}">${esc(stateLabel(card.overall, main.pct))}</span>` : '';
   return `<button class="card" type="button" data-tab="${esc(card.tab)}" aria-label="Apri ${esc(card.name)}">
       <div class="card-head"><h3>${esc(card.name)}</h3><span class="right">${chip}<span class="go">${icon('arrowRight', 16)}</span></span></div>
+      ${card.proposals.length ? `<div class="card-prop">Da confermare: ${card.proposals.map(monthShort).join(' e ')}</div>` : ''}
       ${card.channels.map(channelHtml).join('')}
       ${card.kpi7 ? `${kpiHtml(card.kpi7)}<div class="card-foot"><span>Ultimi 7 giorni rispetto ai 7 prima · solo Meta</span></div>` : ''}
     </button>`;
