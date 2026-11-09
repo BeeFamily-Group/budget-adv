@@ -268,6 +268,16 @@ table.plan tr.cur td:first-child { background: #f7f5ef; }
 .days-txt { display: block; margin-top: 3px; text-align: right; color: var(--muted); font-size: 12px; }
 table.plan th.status-h { text-align: left; }
 td.status { font-size: 12px; color: var(--muted); white-space: normal; min-width: 140px; max-width: 220px; text-align: left !important; }
+/* Anno precedente mese per mese */
+.pm-h { margin: 18px 0 8px; font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; }
+.pm { display: grid; gap: 5px; margin-bottom: 8px; }
+.pm-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) 76px 36px; gap: 10px; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+.pm-row span:first-child { color: var(--ink-2); }
+.pm-track { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.pm-track i { display: block; height: 100%; border-radius: 4px; background: var(--navy); }
+.pm-row b { text-align: right; font-weight: 600; }
+.pm-row em { font-style: normal; color: var(--muted); text-align: right; }
+
 /* Note del mese: riga sotto il mese, a tutta larghezza; il testo resta fermo a sinistra mentre la tabella scorre */
 table.plan tr.has-notes td { border-bottom-color: transparent; }
 table.plan tr.note-row td { position: static; padding-top: 0; text-align: left; white-space: normal; }

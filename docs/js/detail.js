@@ -1,5 +1,5 @@
 // Dettaglio di una struttura: canali, risultati, piano mese per mese, chiusura, note.
-import { buildDetail, buildReport, channelLabel, stateLabel, channelView, applyFrom, staleText, trendDaily } from './viewmodel.js';
+import { buildDetail, buildReport, prevMonthly, channelLabel, stateLabel, channelView, applyFrom, staleText, trendDaily } from './viewmodel.js';
 import { fmtEur, parseEur } from './calc.js';
 import { store, esc, ddmm, monthShort, monthLong, kpiHtml, barHtml, reload, render as renderHome } from './app.js';
 import { post } from './api.js';
@@ -149,19 +149,30 @@ function totalBox(d) {
     </div>`;
 }
 
-// Anno precedente: totali del blocco 2026 del vecchio foglio (righe 9-11 del tab), per canale.
-function prevBox(d) {
+// Anno precedente: totali del blocco 2026 del vecchio foglio (righe 9-11 del tab), per canale,
+// più l'investito mese per mese del 2026 (data/storico-2026.json) per vedere come si è distribuito.
+function prevBox(d, monthly) {
   const p = d.prev;
-  if (!p) return '';
+  if (!p && !monthly) return '';
   const pct = (c) => (c.programmed > 0 ? `${Math.round((c.spent / c.programmed) * 100)}%` : '—');
-  const rows = p.channels.map(c => `<tr><td><span class="plat ${c.kind}"><i></i>${esc(channelLabel(c.title))}</span></td>
-      <td>${fmtEur(c.programmed)}</td><td>${fmtEur(c.spent)}</td><td>${pct(c)}</td></tr>`).join('');
-  return `<div class="box prev-box"><div class="box-head"><div><h2>Anno precedente · ${p.year}</h2>
-      <p class="small">Totali del blocco ${p.year} del vecchio foglio budget (di solito da novembre ${p.year - 1} a dicembre ${p.year}).</p></div></div>
-      <div class="scroll-x"><table class="t"><thead><tr><th>Canale</th><th>Programmato</th><th>Investito</th><th>Investito sul programmato</th></tr></thead><tbody>
-        ${rows}
+  const table = p ? `<div class="scroll-x"><table class="t"><thead><tr><th>Canale</th><th>Programmato</th><th>Investito</th><th>Investito sul programmato</th></tr></thead><tbody>
+        ${p.channels.map(c => `<tr><td><span class="plat ${c.kind}"><i></i>${esc(channelLabel(c.title))}</span></td>
+          <td>${fmtEur(c.programmed)}</td><td>${fmtEur(c.spent)}</td><td>${pct(c)}</td></tr>`).join('')}
         ${p.channels.length > 1 ? `<tr><td><b>Totale</b></td><td><b>${fmtEur(p.total.programmed)}</b></td><td><b>${fmtEur(p.total.spent)}</b></td><td><b>${pct(p.total)}</b></td></tr>` : ''}
-      </tbody></table></div></div>`;
+      </tbody></table></div>` : '';
+  let months = '';
+  if (monthly) {
+    const max = Math.max(...monthly.map(m => m.spent), 0);
+    months = `<h3 class="pm-h">2026 mese per mese, fino a settembre · investito, tutti i canali</h3>
+      <div class="pm">${monthly.map(m => `<div class="pm-row"><span>${monthShort(m.ym)}</span>
+        <span class="pm-track"><i style="width:${max > 0 ? ((m.spent / max) * 100).toFixed(1) : 0}%"></i></span>
+        <b>${fmtEur(m.spent)}</b><em>${m.share}%</em></div>`).join('')}</div>
+      <p class="small">Dal vecchio foglio budget, dati al ${ddmm((store.storico && store.storico.as_of) || '')}: la % è la quota del mese su gennaio–settembre. Da ottobre 2026 i mesi sono nel piano qui sopra.</p>`;
+  }
+  const year = p ? p.year : 2026;
+  return `<div class="box prev-box"><div class="box-head"><div><h2>Anno precedente · ${year}</h2>
+      ${p ? `<p class="small">Totali del blocco ${year} del vecchio foglio budget (di solito da novembre ${year - 1} a dicembre ${year}).</p>` : ''}</div></div>
+      ${table}${months}</div>`;
 }
 
 const AUTHOR_SHORT = { francesco: 'Francesco', marco: 'Marco', ambra: 'Ambra' };
@@ -311,7 +322,7 @@ function paint() {
       ${totalBox(d)}
       <div class="grid2 after-total">${d.channels.map(c => channelBox(c, d)).join('')}</div>
       <section class="panel trend" id="dtrend" aria-label="Andamento"></section>
-      ${resultsBox(d)}${planBox(d)}${closingBox(d)}${notesBox(d)}${prevBox(d)}
+      ${resultsBox(d)}${planBox(d)}${closingBox(d)}${notesBox(d)}${prevBox(d, prevMonthly(store.storico, store.state.structures.find(s => s.tab === currentTab), d.totals.from))}
     </div>`;
   mountTrend(document.getElementById('dtrend'), {
     daily: trendDaily(store.state, store.meta, [currentTab], store.asOf), plan: planFor(d), scope: currentTab, key: 'detail',

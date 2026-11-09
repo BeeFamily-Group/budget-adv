@@ -1,12 +1,12 @@
 // Schermata principale: ricerca, mesi, andamento, schede per struttura, campagne da assegnare.
-import { getState, getMeta, isDemo } from './api.js';
+import { getState, getMeta, getStorico, isDemo } from './api.js';
 import { buildCards, unassigned, channelLabel, stateLabel, staleAccounts, staleText, macLate, trendDaily, matchQuery } from './viewmodel.js';
 import { fmtEur } from './calc.js';
 import { icon } from './icons.js';
 import { mountTrend } from './trend.js';
 import { SHEET_LABEL } from '../config.js';
 
-export const store = { state: null, meta: null, ym: null, asOf: null, today: null, q: '', onlyOff: false, role: null, code: null };
+export const store = { state: null, meta: null, storico: null, ym: null, asOf: null, today: null, q: '', onlyOff: false, role: null, code: null };
 
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -132,9 +132,10 @@ async function openDetail(tab) {
 }
 
 export async function reload() {
-  const [state, meta] = await Promise.all([getState(), getMeta()]);
+  const [state, meta, storico] = await Promise.all([getState(), getMeta(), store.storico ? store.storico : getStorico()]);
   store.state = state;
   store.meta = meta;
+  store.storico = storico;
   store.today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
   store.asOf = meta.as_of || new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   store.ym = store.ym || store.asOf.slice(0, 7);

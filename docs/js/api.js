@@ -19,6 +19,16 @@ export async function getMeta() {
   return r.json();
 }
 
+// Anno precedente mese per mese (file fisso estratto dal vecchio foglio). Se manca, la pagina va avanti senza.
+export async function getStorico() {
+  try {
+    const r = await fetch('data/storico-2026.json', { cache: 'no-store' });
+    return r.ok ? await r.json() : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // POST in text/plain: niente preflight CORS verso Apps Script.
 export async function post(action, payload, code) {
   if (DEMO) return { ok: false, error: 'modalità demo: niente salvataggi' };

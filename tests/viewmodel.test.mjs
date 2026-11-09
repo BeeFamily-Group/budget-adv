@@ -400,3 +400,22 @@ test('report: canali con giorni diversi nel mese dopo, niente €/giorno unico',
 test('report dell\'ultimo mese del piano: nessun mese dopo', () => {
   assert.equal(buildReport(withReq, meta, 'Ciccio', '2027-12', '2026-11-14', '2026-11-14').next, null);
 });
+
+import { prevMonthly } from '../docs/js/viewmodel.js';
+
+test('anno precedente mese per mese: somma dei canali della struttura e quota sull\'anno', () => {
+  const storico = { tabs: { Ciccio: {
+    'BUDGET FACEBOOK ADS': { '2026-01': { programmed: 100, spent: 300 }, '2026-02': { programmed: 100, spent: 100 } },
+    'BUDGET GOOGLE ADS': { '2026-01': { programmed: 50, spent: 100 }, '2026-03': { programmed: 0, spent: null } },
+    'ALTRO BLOCCO': { '2026-01': { programmed: 999, spent: 999 } },
+  } } };
+  const s = withReq.structures.find(x => x.tab === 'Ciccio');
+  assert.deepEqual(prevMonthly(storico, s), [
+    { ym: '2026-01', spent: 400, share: 80 },
+    { ym: '2026-02', spent: 100, share: 20 },
+    { ym: '2026-03', spent: 0, share: 0 },
+  ]);
+  assert.deepEqual(prevMonthly(storico, s, '2026-02'), [{ ym: '2026-01', spent: 400, share: 100 }]);
+  assert.equal(prevMonthly(null, s), null);
+  assert.equal(prevMonthly({ tabs: {} }, s), null);
+});

@@ -364,6 +364,27 @@ export function prevYearTotals(structure) {
   return { year: channels[0].year, channels, total: { programmed, spent, pct: pctOf(spent, programmed) } };
 }
 
+// Anno precedente mese per mese (gen–dic 2026 dal vecchio foglio, data/storico-2026.json): investito di tutti
+// i canali della struttura e quota sul totale dell'anno. null se il file non c'è o la struttura non ha dati.
+// beforeYm: solo i mesi prima del piano attuale (da ottobre 2026 i mesi stanno già nel piano, e il vecchio foglio non li ha completi).
+export function prevMonthly(storico, structure, beforeYm = null) {
+  const chans = storico && storico.tabs && storico.tabs[structure.tab];
+  if (!chans) return null;
+  const titles = new Set(structure.channels.map(c => c.title));
+  const by = new Map();
+  for (const [title, months] of Object.entries(chans)) {
+    if (!titles.has(title)) continue;
+    for (const [ym, v] of Object.entries(months)) {
+      if (beforeYm && ym >= beforeYm) continue;
+      by.set(ym, round2((by.get(ym) || 0) + (v.spent || 0)));
+    }
+  }
+  if (!by.size) return null;
+  const total = [...by.values()].reduce((a, v) => a + v, 0);
+  return [...by.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([ym, spent]) => ({ ym, spent, share: total > 0 ? Math.round((spent / total) * 100) : 0 }));
+}
+
 // Report mensile per il cliente: solo speso del mese, programmato del mese dopo, speso sul totale del piano.
 export function buildReport(state, meta, tab, ym, asOf, today = asOf) {
   const d = buildDetail(state, meta, tab, ym, asOf, null, today);
