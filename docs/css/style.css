@@ -25,7 +25,7 @@
   --proposal: #fff2cc; --proposal-line: #ecd48a;
 
   --c-spend: #1f4f82; --c-leads: #1a9e8f; --c-cpl: #df6a2a;
-  --meta: #0866ff; --google: #188038;
+  --meta: #0866ff; --google: #188038; --chatgpt: #10a37f;
 
   --radius: 8px;
   --display: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -187,6 +187,7 @@ table, .num, .kpi .v, .ch-num, .tiles .v { font-variant-numeric: tabular-nums; }
 .plat { display: inline-flex; align-items: center; gap: 7px; font-weight: 500; color: var(--ink-2); white-space: nowrap; }
 .plat i { width: 8px; height: 8px; border-radius: 50%; background: var(--meta); }
 .plat.google i { background: var(--google); }
+.plat.chatgpt i { background: var(--chatgpt); }
 .ch-num { color: var(--muted); white-space: nowrap; }
 .ch-num b { color: var(--ink); font-weight: 600; }
 .ch-foot { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); }

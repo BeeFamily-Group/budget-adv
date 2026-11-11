@@ -77,6 +77,11 @@ function channelBox(c, d) {
   if (c.kind === 'meta') {
     rows.push(['Ieri', c.dataStaleSince ? '— (dati fermi)' : fmtEur(yesterday)]);
     rows.push(['Impostato su Meta oggi', `${fmtEur(c.dailyBudget)}/g · ${c.activeCampaigns} ${c.activeCampaigns === 1 ? 'campagna attiva' : 'campagne attive'}`]);
+  } else if (c.kind === 'chatgpt') {
+    rows.push(['Aggiornato', c.updatedOn ? `${ddmm(c.updatedOn)} in automatico` : 'non ancora letto']);
+    if (c.dailyBudget !== null) rows.push(['Impostato su ChatGPT Ads', `${fmtEur(c.dailyBudget)}/g · ${c.activeCampaigns ? 'attiva' : 'ferma'}`]);
+    if (c.leadsMtd !== null) rows.push(['Clic del mese', String(c.leadsMtd)]);
+    if (c.leadsMtd > 0) rows.push(['Costo per clic', eur2(c.spent / c.leadsMtd)]);
   } else {
     rows.push(['Aggiornato', c.updatedOn ? `${ddmm(c.updatedOn)} da Marco` : 'mai']);
     if (c.dailyBudget !== null) rows.push(['Impostato su Google', `${fmtEur(c.dailyBudget)}/g · ${c.activeCampaigns ? 'attive' : 'ferme'}`]);
@@ -108,7 +113,7 @@ function channelBox(c, d) {
       </form>`;
   }
   return `<div class="box">
-      <div class="box-head"><span class="plat ${c.kind}"><i></i>${esc(label)} · ${c.kind === 'meta' ? 'automatico' : 'da Marco'}</span>
+      <div class="box-head"><span class="plat ${c.kind}"><i></i>${esc(label)} · ${c.kind === 'google' ? 'da Marco' : 'automatico'}</span>
         <span class="chip ${c.state}">${esc(stateLabel(c.state, c.pct))}</span></div>
       <div class="big">${fmtEur(c.spent)} <small>di ${fmtEur(c.programmed)} programmati</small></div>
       ${barHtml(c)}
@@ -188,12 +193,19 @@ function proposalTitle(p, c) {
 function resultsBox(d) {
   const m = d.results.month;
   const cpl = (sp, l) => (l > 0 ? eur2(sp / l) : '—');
+  const kinds = new Set(d.channels.map(c => c.kind));
+  const showMeta = kinds.has('meta') || !m.chatgpt;     // strutture senza ChatGPT: righe di sempre
+  const showGoogle = kinds.has('google') || !m.chatgpt;
+  const gpt = m.chatgpt ? `<tr><td><span class="plat chatgpt"><i></i>ChatGPT</span></td><td>${fmtEur(m.chatgpt.spend)}</td><td>—</td><td>—</td></tr>` : '';
+  const gptNote = m.chatgpt ? `<p class="small" style="margin:8px 0 0">ChatGPT Ads: ${m.chatgpt.clicks} clic${m.chatgpt.clicks > 0 ? `, ${eur2(m.chatgpt.spend / m.chatgpt.clicks)} a clic` : ''}. I clic non sono lead: restano fuori dal costo per lead.</p>` : '';
   return `<div class="box"><div class="box-head"><div><h2>Risultati di ${monthLong(d.ym)}</h2><p class="small">Google con i numeri inseriti da Marco.</p></div></div>
       <div class="scroll-x"><table class="t"><thead><tr><th>Canale</th><th>Spesa</th><th>Lead</th><th>Costo per lead</th></tr></thead><tbody>
-        <tr><td><span class="plat meta"><i></i>Meta</span></td><td>${fmtEur(m.meta.spend)}</td><td>${m.meta.leads}</td><td>${cpl(m.meta.spend, m.meta.leads)}</td></tr>
-        <tr><td><span class="plat google"><i></i>Google</span></td><td>${fmtEur(m.google.spend)}</td><td>${m.google.leads}</td><td>${cpl(m.google.spend, m.google.leads)}</td></tr>
+        ${showMeta ? `<tr><td><span class="plat meta"><i></i>Meta</span></td><td>${fmtEur(m.meta.spend)}</td><td>${m.meta.leads}</td><td>${cpl(m.meta.spend, m.meta.leads)}</td></tr>` : ''}
+        ${showGoogle ? `<tr><td><span class="plat google"><i></i>Google</span></td><td>${fmtEur(m.google.spend)}</td><td>${m.google.leads}</td><td>${cpl(m.google.spend, m.google.leads)}</td></tr>` : ''}
+        ${gpt}
         <tr><td><b>Totale</b></td><td><b>${fmtEur(m.total.spend)}</b></td><td><b>${m.total.leads}</b></td><td><b>${cpl(m.total.spend, m.total.leads)}</b></td></tr>
       </tbody></table></div>
+      ${gptNote}
       ${d.results.last7 ? `<div style="margin-top:14px">${kpiHtml(d.results.last7)}<p class="small" style="margin:8px 0 0">Ultimi 7 giorni rispetto ai 7 prima · solo Meta</p></div>` : ''}</div>`;
 }
 
@@ -214,7 +226,7 @@ function planBox(d) {
     const editable = p.ym >= current;
     const rowCls = p.ym === nowYm ? 'cur' : (p.ym > nowYm ? 'future' : 'past');
     const cells = p.channels.map((c, k) => {
-      const mine = (c.kind === 'meta' && d.can.editMeta) || (c.kind === 'google' && d.can.editGoogle);
+      const mine = ((c.kind === 'meta' || c.kind === 'chatgpt') && d.can.editMeta) || (c.kind === 'google' && d.can.editGoogle);
       const canWrite = (editable && mine) || (d.can.propose && p.ym > nowYm);   // Ambra: solo proposte sui mesi dopo quello in corso
       const val = c.eur ?? '';
       const input = canWrite
@@ -287,7 +299,7 @@ function paint() {
         <button type="button" data-act="nextMonth" aria-label="Mese dopo"${i >= list.length - 1 ? ' disabled' : ''}>${icon('chevronRight', 16)}</button></div>
       ${ro}</div>
     <div class="detail-body">
-      <header class="dh"><div><h1>${esc(real.name)}</h1><p class="sub">${real.place ? `${esc(real.place)} · ` : ''}${monthLong(store.ym)} · ${updateLineHtml(updateDates(store.meta, store.state))}</p></div>
+      <header class="dh"><div><h1>${esc(real.name)}</h1><p class="sub">${real.place ? `${esc(real.place)} · ` : ''}${monthLong(store.ym)} · ${updateLineHtml(updateDates(store.meta, store.state), d.channels.some(c => c.kind === 'chatgpt') ? d.channels.map(c => c.kind) : undefined)}</p></div>
         <button class="btn report-btn" type="button" data-act="report" title="PDF per il cliente: speso del mese, programmato del mese dopo, speso sul totale">${icon('download', 15)}Report di ${monthShort(store.ym)}</button></header>
       ${tilesHtml(d)}
       ${totalBox(d)}
@@ -422,7 +434,7 @@ async function onKey(e) {
     i.disabled = true;
     const r = await post('savePlan', { channel_id: i.dataset.id, title: titleOf(i.dataset.id), ym: i.dataset.ym, eur }, store.code);
     if (!r.ok) { toast(`Non salvata: ${r.error}`); i.disabled = false; return; }
-    await refreshAfter(`Proposta salvata: resta in giallo finché ${ch.kind === 'meta' ? 'Francesco' : 'Marco'} non la conferma.`);
+    await refreshAfter(`Proposta salvata: resta in giallo finché ${ch.kind === 'google' ? 'Marco' : 'Francesco'} non la conferma.`);
     return;
   }
   const check = ch.kind === 'meta' ? await metaCheck(i.dataset.id, eur) : null;

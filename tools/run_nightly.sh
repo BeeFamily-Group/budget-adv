@@ -26,6 +26,8 @@ case "${1:-}" in
       --state raw/state.json --roster "$ROSTER" --as-of "$AS_OF" --mapping-out raw/mapping_new.json
     echo "mappa: $($PY tools/routine_api.py post upsertMapping @raw/mapping_new.json)"
     echo "speso nello Sheet: $($PY tools/routine_api.py spend docs/data/meta.json)"
+    # ChatGPT Ads (dall'11/11, Color Holiday - Chatgpt ADS): solo lettura; un errore qui non ferma la pubblicazione Meta
+    echo "chatgpt: $($PY tools/chatgpt.py 2>&1 || echo 'non letto')"
     tools/publish.sh "$AS_OF"
     ;;
   *) echo "uso: $0 plan|finish"; exit 2 ;;

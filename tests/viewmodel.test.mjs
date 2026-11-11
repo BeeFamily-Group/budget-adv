@@ -134,7 +134,7 @@ test('dettaglio: note del mese per autore', () => {
 
 test('dettaglio: risultati del mese', () => {
   const d = buildDetail(withReq, meta, 'Ciccio', '2026-11', '2026-11-14', null);
-  assert.deepEqual(d.results.month, { meta: { spend: 1140, leads: 228 }, google: { spend: 1050, leads: 64 },
+  assert.deepEqual(d.results.month, { meta: { spend: 1140, leads: 228 }, google: { spend: 1050, leads: 64 }, chatgpt: null,
                                       total: { spend: 2190, leads: 292, cpl: 7.5 } });
 });
 
@@ -438,8 +438,8 @@ test('anno precedente da gennaio a dicembre: vecchio foglio fino a settembre, po
 });
 
 test('date di aggiornamento: Meta automatico, Google dall\'ultimo inserimento di Marco', () => {
-  assert.deepEqual(updateDates({ as_of: '2026-11-08' }, state), { meta: '2026-11-08', google: '2026-11-12' });
-  assert.deepEqual(updateDates({ as_of: null }, { ...state, google: [] }), { meta: null, google: null });
+  assert.deepEqual(updateDates({ as_of: '2026-11-08' }, state), { meta: '2026-11-08', google: '2026-11-12', chatgpt: null });
+  assert.deepEqual(updateDates({ as_of: null }, { ...state, google: [] }), { meta: null, google: null, chatgpt: null });
 });
 
 test('riga delle date sotto il nome: ultimo aggiornamento in grassetto', () => {
@@ -471,4 +471,49 @@ test('nomi reali nel report', () => {
   assert.equal(r.name, 'Ciccio Family Hotel');
   assert.equal(r.place, 'Misano Adriatico');
   assert.equal(r.tab, 'Ciccio');
+});
+
+// ---------- ChatGPT Ads (11/11): Color Holiday - Chatgpt ADS ----------
+const GPT_TAB = 'Color Holiday - Chatgpt ADS';
+const gptMonths = state.structures.find(s => s.tab === 'Ciccio').channels[0].months
+  .map(m => ({ ...m, eur: m.ym === '2026-11' ? 25 : null, days: m.ym === '2026-11' ? 30 : null, proposal: false, sheet_spent: null }));
+const gptState = {
+  ...state,
+  structures: [...state.structures, { tab: GPT_TAB, channels: [{ id: `${GPT_TAB}|A`, kind: 'chatgpt', title: 'BUDGET CHATGPT ADS', months: gptMonths, prev: null }] }],
+  chatgpt: [{ channel_id: `${GPT_TAB}|A`, date: '2026-11-10', spent_mtd: 198.74, leads_mtd: 74, daily_budget: 25, active: true }],
+};
+
+test('ChatGPT: etichetta, speso e clic dal tab CHATGPT (non da GOOGLE)', () => {
+  assert.equal(channelLabel('BUDGET CHATGPT ADS'), 'ChatGPT');
+  const c = buildCards(gptState, meta, '2026-11', '2026-11-14').find(x => x.tab === GPT_TAB).channels[0];
+  assert.equal(c.kind, 'chatgpt');
+  assert.equal(c.programmed, 750);
+  assert.equal(c.spent, 198.74);
+  assert.equal(c.leadsMtd, 74);
+  assert.equal(c.dailyBudget, 25);
+  assert.equal(c.updatedOn, '2026-11-10');
+});
+
+test('ChatGPT senza dati della routine: "numeri da inserire" come Google', () => {
+  const c = buildCards({ ...gptState, chatgpt: [] }, meta, '2026-11', '2026-11-14').find(x => x.tab === GPT_TAB).channels[0];
+  assert.equal(c.state, 'nodata');
+});
+
+test('ChatGPT nel dettaglio: spesa nel totale, clic a parte (non sono lead)', () => {
+  const d = buildDetail(gptState, meta, GPT_TAB, '2026-11', '2026-11-14', 'francesco', '2026-11-14');
+  assert.deepEqual(d.results.month.chatgpt, { spend: 198.74, clicks: 74 });
+  assert.equal(d.results.month.total.spend, 198.74);
+  assert.equal(d.results.month.total.leads, 0);
+  assert.equal(d.plan.find(p => p.ym === '2026-11').channels[0].spent, 198.74);
+  assert.equal(d.can.editMeta, true);   // il piano ChatGPT lo scrive Francesco
+});
+
+test('date di aggiornamento: ChatGPT automatico, solo sulle strutture che lo hanno', () => {
+  assert.equal(updateDates({ as_of: '2026-11-08' }, gptState).chatgpt, '2026-11-10');
+  assert.equal(updateLineHtml({ meta: '2026-11-08', google: null, chatgpt: '2026-11-10' }, ['chatgpt']),
+    'ChatGPT aggiornato al <b>10/11/2026</b> (automatico)');
+  assert.equal(updateLineHtml({ meta: '2026-11-08', google: null, chatgpt: null }, ['chatgpt']),
+    'ChatGPT non ancora letto (automatico)');
+  assert.equal(updateLineHtml({ meta: '2026-11-08', google: '2026-11-05', chatgpt: '2026-11-10' }),
+    'Meta aggiornato al <b>08/11/2026</b> (automatico) · Google aggiornato al <b>05/11/2026</b> (manuale)');
 });

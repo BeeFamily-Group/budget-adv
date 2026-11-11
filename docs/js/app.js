@@ -39,8 +39,9 @@ export function barHtml(c) {
 
 function channelHtml(c) {
   const close = c.perDay !== null && c.programmed > 0 && c.remaining > 0 ? `servono ${fmtEur(c.perDay)}/g` : '';
+  const who = c.kind === 'chatgpt' ? 'ChatGPT' : 'Marco';   // ChatGPT: letto in automatico ogni notte
   const foot = c.kind === 'meta' ? close
-    : (c.updatedOn ? [close, `Marco ${ddmm(c.updatedOn)}`].filter(Boolean).join(' · ') : 'Marco: numeri da inserire');
+    : (c.updatedOn ? [close, `${who} ${ddmm(c.updatedOn)}`].filter(Boolean).join(' · ') : (c.kind === 'chatgpt' ? 'ChatGPT: dati non ancora letti' : 'Marco: numeri da inserire'));
   const flags = [];
   if (c.dataStaleSince) flags.push(`Dati Meta ${staleText(c.dataStaleSince)}`);
   if (c.kind === 'google' && c.updatedOn && c.stale && c.programmed > 0) flags.push('Google non aggiornato da più di 7 giorni');

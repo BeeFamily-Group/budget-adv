@@ -5,7 +5,7 @@ import {
 
 export function channelLabel(title) {
   const t = String(title).toUpperCase();
-  const base = t.includes('FACEBOOK') ? 'Meta' : 'Google';
+  const base = t.includes('FACEBOOK') ? 'Meta' : (t.includes('CHATGPT') ? 'ChatGPT' : 'Google');
   if (t.includes('ITALIA')) return `${base} Italia`;
   if (t.includes('ESTERO')) return `${base} estero`;
   if (t.includes('GAS')) return `${base} GAS`;
@@ -23,6 +23,9 @@ export function stateLabel(state, pct) {
   if (state === 'over') return pct === null ? 'spesa senza budget' : `sopra +${pct}%`;
   return 'nessun budget';
 }
+
+// Dati dei canali esterni a Meta: Google dal tab GOOGLE (Marco/script), ChatGPT dal tab CHATGPT (routine notturna).
+const extRows = (state, ch) => (ch.kind === 'chatgpt' ? state.chatgpt : state.google) || [];
 
 const RANK = { over: 3, early: 3, under: 2, ok: 1, nodata: 0.6, notyet: 0.5, none: 0 };
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -149,7 +152,7 @@ export function channelView(state, meta, ch, ym, asOf, today = asOf) {
     extra = { dailyBudget: s.dailyBudget, activeCampaigns: s.activeCampaigns, daily: s.daily,
               updatedOn: null, stale: false, dataStaleSince: staleSince(meta, state.mapping, ch) };
   } else {
-    g = latestGoogle(state.google, ch.id, ym);
+    g = latestGoogle(extRows(state, ch), ch.id, ym);
     spent = g ? Number(g.spent_mtd) : 0;
     spentAsOf = g ? String(g.date) : null;
     extra = { dailyBudget: g ? Number(g.daily_budget) : null, activeCampaigns: g ? (g.active ? 1 : 0) : null,
@@ -160,7 +163,7 @@ export function channelView(state, meta, ch, ym, asOf, today = asOf) {
   const expected = expectedToDate(programmed, elapsed, win.days);
   let pace;
   if (programmed === 0 && spent === 0) pace = { state: 'none', pct: null };
-  else if (ch.kind === 'google' && !g && programmed > 0 && ym <= today.slice(0, 7)) pace = { state: 'nodata', pct: null };
+  else if (ch.kind !== 'meta' && !g && programmed > 0 && ym <= today.slice(0, 7)) pace = { state: 'nodata', pct: null };
   else if (programmed > 0 && !(expected > 0)) pace = { state: spent > 0 ? 'early' : 'notyet', pct: null };
   else pace = pacing(spent, expected);
   // Spesa Effettiva dello Sheet diversa da quella calcolata (inserita a mano, per esempio dalle fatture)
@@ -283,7 +286,10 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
   const googleCh = channels.filter(c => c.kind === 'google');
   const metaM = { spend: Math.round(sum(metaCh, c => c.spent) * 100) / 100, leads: sum(metaCh, c => sum(c.daily, d => d.leads)) };
   const googleM = { spend: sum(googleCh, c => c.spent), leads: sum(googleCh, c => c.leadsMtd) };
-  const total = { spend: metaM.spend + googleM.spend, leads: metaM.leads + googleM.leads };
+  // ChatGPT: la spesa entra nel totale, i clic restano a parte (non sono lead e falserebbero il costo per lead)
+  const gptCh = channels.filter(c => c.kind === 'chatgpt');
+  const chatgptM = gptCh.length ? { spend: round2(sum(gptCh, c => c.spent)), clicks: sum(gptCh, c => c.leadsMtd) } : null;
+  const total = { spend: round2(metaM.spend + googleM.spend + (chatgptM ? chatgptM.spend : 0)), leads: metaM.leads + googleM.leads };
   total.cpl = total.leads > 0 ? Math.round((total.spend / total.leads) * 100) / 100 : null;
 
   const yms = s.channels[0].months.map(m => m.ym);
@@ -299,7 +305,7 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
       if (y <= today.slice(0, 7)) {
         let computed = null;
         if (ch.kind === 'meta') { const sp = metaSpent(meta, state.mapping, ch, y, asOf).spent; computed = sp > 0 ? sp : null; }
-        else { const g = latestGoogle(state.google, ch.id, y); computed = g ? Number(g.spent_mtd) : null; }
+        else { const g = latestGoogle(extRows(state, ch), ch.id, y); computed = g ? Number(g.spent_mtd) : null; }
         spent = computed ?? m.sheet_spent ?? (y === today.slice(0, 7) ? 0 : null);
       }
       const programmed = (m.eur || 0) * (m.days || 0);
@@ -344,7 +350,7 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
     tab, ym, channels, plan, closing, notes,
     totals: planTotals(plan),
     prev: prevYearTotals(s),
-    results:{ month: { meta: metaM, google: googleM, total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf, today)[0].kpi7 },
+    results:{ month: { meta: metaM, google: googleM, chatgpt: chatgptM, total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf, today)[0].kpi7 },
     can: { editMeta: role === 'francesco', editGoogle: role === 'marco', note: Boolean(role), propose: role === 'ambra' },
   };
 }
@@ -426,15 +432,19 @@ export function prevYearMonths(storico, structure, plan, nowYm) {
 const dmyOf = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 
 // Riga sotto il nome della struttura: data dell'ultimo aggiornamento in grassetto per ciascuna fonte.
-export function updateLineHtml(u) {
-  const meta = u.meta ? `Meta aggiornato al <b>${dmyOf(u.meta)}</b> (automatico)` : 'Meta non ancora letto (automatico)';
-  const google = u.google ? `Google aggiornato al <b>${dmyOf(u.google)}</b> (manuale)` : 'Google non ancora inserito da Marco (manuale)';
-  return `${meta} · ${google}`;
+// kinds: i canali della struttura; senza, la riga classica Meta + Google.
+export function updateLineHtml(u, kinds = ['meta', 'google']) {
+  const parts = {
+    meta: u.meta ? `Meta aggiornato al <b>${dmyOf(u.meta)}</b> (automatico)` : 'Meta non ancora letto (automatico)',
+    google: u.google ? `Google aggiornato al <b>${dmyOf(u.google)}</b> (manuale)` : 'Google non ancora inserito da Marco (manuale)',
+    chatgpt: u.chatgpt ? `ChatGPT aggiornato al <b>${dmyOf(u.chatgpt)}</b> (automatico)` : 'ChatGPT non ancora letto (automatico)',
+  };
+  return ['meta', 'google', 'chatgpt'].filter(k => kinds.includes(k)).map(k => parts[k]).join(' · ');
 }
 
 export function updateDates(meta, state) {
-  const dates = (state.google || []).map(g => String(g.date || '').slice(0, 10)).filter(Boolean).sort();
-  return { meta: (meta && meta.as_of) || null, google: dates.length ? dates[dates.length - 1] : null };
+  const last = (rows) => (rows || []).map(g => String(g.date || '').slice(0, 10)).filter(Boolean).sort().pop() || null;
+  return { meta: (meta && meta.as_of) || null, google: last(state.google), chatgpt: last(state.chatgpt) };
 }
 
 // Report mensile per il cliente: solo speso del mese, programmato del mese dopo, speso sul totale del piano.

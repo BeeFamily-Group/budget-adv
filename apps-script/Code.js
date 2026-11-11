@@ -4,6 +4,8 @@
 var SERVICE_TABS = {
   NOTE: ['ts', 'tab', 'ym', 'author', 'text'],
   GOOGLE: ['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author'],
+  // ChatGPT Ads (11/11): stesse colonne di GOOGLE, scrive solo la routine notturna; leads_mtd = clic del mese.
+  CHATGPT: ['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author'],
   'RICHIESTE META': ['id', 'channel_id', 'ym', 'eur', 'current_budget', 'apply_from', 'created_by', 'created_at', 'status', 'result', 'updated_at'],
   MAPPA: ['account_id', 'campaign_id', 'campaign_name', 'channel_id', 'channel_title'],
   GIORNI: ['channel_id', 'ym', 'start_day'],
@@ -49,6 +51,32 @@ function ensureHeader(name) {
     sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold');
   }
   return sh;
+}
+
+// Tab di servizio, creato con l'intestazione se ancora non c'è (CHATGPT al primo dato della routine).
+function serviceSheet(name) {
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName(name);
+  if (sh) return sh;
+  sh = ss.insertSheet(name, ss.getSheets().length);
+  sh.getRange(1, 1, 1, SERVICE_TABS[name].length).setValues([SERVICE_TABS[name]]).setFontWeight('bold');
+  sh.setFrozenRows(1);
+  return sh;
+}
+
+// Una riga per blocco e mese nel tab di servizio (GOOGLE o CHATGPT): si aggiorna quella del mese, a meno che non ci sia
+// già un dato con una data più recente (resta quello). Poi la Spesa Effettiva del mese nello Sheet.
+function saveChannelRow(who, action, tabName, b) {
+  var day = function (v) { return String(v).replace(/^'/, '').slice(0, 10); };
+  var last = rows(tabName).filter(function (r) { return r.channel_id === b.channel_id && day(r.date).slice(0, 7) === day(b.date).slice(0, 7); })
+    .sort(function (x, y) { return day(x.date).localeCompare(day(y.date)); }).pop();
+  if (last && day(last.date) > day(b.date)) return { ok: true, sheet: 'già presente un dato più recente' };
+  var values = [nowIso(), b.channel_id, "'" + b.date, Number(b.spent_mtd), Number(b.leads_mtd || 0), Number(b.daily_budget || 0), Boolean(b.active), who];
+  var sh = serviceSheet(tabName);
+  if (last) sh.getRange(last._row, 1, 1, values.length).setValues([values]);
+  else sh.appendRow(values);
+  var res = writeSpendCell(who, action, b.channel_id, b.title, String(b.date).slice(0, 7), b.spent_mtd);
+  return { ok: true, sheet: res.skipped || 'aggiornato' };
 }
 
 function clientSheets() {
@@ -102,6 +130,7 @@ function buildState() {
     skipped_tabs: skipped,
     notes: strip(rows('NOTE')),
     google: strip(rows('GOOGLE')),
+    chatgpt: strip(rows('CHATGPT')),
     requests: strip(rows('RICHIESTE META')),
     mapping: strip(rows('MAPPA')),
     days: strip(rows('GIORNI')),
@@ -161,7 +190,7 @@ function lastSystemWrite(cellA1) {
   if (!SYS_WRITES) {
     SYS_WRITES = {};
     rows('LOG').forEach(function (r) {
-      if (r.action === 'writeSpend' || r.action === 'saveGoogle') SYS_WRITES[r.cell] = r.after;
+      if (r.action === 'writeSpend' || r.action === 'saveGoogle' || r.action === 'saveChatgpt') SYS_WRITES[r.cell] = r.after;
     });
   }
   return Object.prototype.hasOwnProperty.call(SYS_WRITES, cellA1) ? SYS_WRITES[cellA1] : null;
@@ -291,16 +320,7 @@ var USER_ACTIONS = {
   saveGoogle: function (role, b) {
     var loc = locateChecked(b.channel_id, b.title);
     if (role !== 'marco' || loc.block.kind !== 'google') return { ok: false, error: 'forbidden' };
-    var day = function (v) { return String(v).replace(/^'/, '').slice(0, 10); };
-    var last = rows('GOOGLE').filter(function (r) { return r.channel_id === b.channel_id && day(r.date).slice(0, 7) === day(b.date).slice(0, 7); })
-      .sort(function (x, y) { return day(x.date).localeCompare(day(y.date)); }).pop();
-    if (last && day(last.date) > day(b.date)) return { ok: true, sheet: 'già presente un dato più recente' };
-    var values = [nowIso(), b.channel_id, "'" + b.date, Number(b.spent_mtd), Number(b.leads_mtd || 0), Number(b.daily_budget || 0), Boolean(b.active), role];
-    var sh = SpreadsheetApp.getActive().getSheetByName('GOOGLE');
-    if (last) sh.getRange(last._row, 1, 1, values.length).setValues([values]);
-    else sh.appendRow(values);
-    var res = writeSpendCell(role, 'saveGoogle', b.channel_id, b.title, String(b.date).slice(0, 7), b.spent_mtd);
-    return { ok: true, sheet: res.skipped || 'aggiornato' };
+    return saveChannelRow(role, 'saveGoogle', 'GOOGLE', b);
   },
 
   metaRequest: function (role, b) {
@@ -374,6 +394,46 @@ var ROUTINE_ACTIONS = {
     e5.setFormula(f5);
     log('routine · ' + String(b.reason).slice(0, 60), 'addBlock', b.tab + '!' + b.to_letter + '13', '', title);
     return { ok: true, channel_id: channelId(b.tab, b.to_letter) };
+  },
+  // Tab cliente nuovo (11/11: "Color Holiday - Chatgpt ADS"): copia di un tab modello con un solo blocco in colonna A,
+  // messo subito dopo il modello; testata nuova, blocco riscritto da newBlockGrid (mesi, formule, niente valori né gialli).
+  addTab: function (b) {
+    var bad = validateAddTab(b);
+    if (bad) return { ok: false, error: bad };
+    var ss = SpreadsheetApp.getActive();
+    var name = String(b.tab).trim();
+    if (SERVICE_TABS[name]) return { ok: false, error: 'nome riservato a un tab di servizio: ' + name };
+    if (ss.getSheetByName(name)) return { ok: false, error: 'esiste già un tab ' + name };
+    var model = SERVICE_TABS[b.model_tab] ? null : ss.getSheetByName(b.model_tab);
+    if (!model) return { ok: false, error: 'tab modello sconosciuto: ' + b.model_tab };
+    var blocks = findBlocks(sheetGrid(model).values);
+    if (blocks.length !== 1 || blocks[0].col !== 1) return { ok: false, error: 'il modello deve avere un solo blocco, in colonna A' };
+    if (model.getRange(4, 5).getFormula() !== '=D30' || model.getRange(5, 5).getFormula() !== '=E30') {
+      return { ok: false, error: 'il modello non ha i totali =D30 e =E30 in E4/E5' };
+    }
+    var pos = ss.getSheets().map(function (s) { return s.getName(); }).indexOf(model.getName()) + 2;
+    var sh = model.copyTo(ss);
+    sh.setName(name);
+    ss.setActiveSheet(sh);
+    ss.moveActiveSheet(pos);
+    var title = String(b.block_title).trim();
+    sh.getRange(1, 1).setValue(String(b.header_title).trim());
+    sh.getRange(2, 1).setValue(b.header_note ? String(b.header_note).trim() : '');
+    var block = sh.getRange(BLOCK.top, 1, BLOCK.rows, BLOCK.cols);
+    block.clearNote();
+    sh.getRange(LAYOUT.firstRow, 1, LAYOUT.count, 1).setNumberFormat('@');   // "Dicembre 2026" resta testo
+    block.setValues(newBlockGrid(1, title, b.prev));
+    sh.getRange(LAYOUT.firstRow, 3, LAYOUT.count, 1).setBackground(null);   // niente gialli copiati dal modello
+    log('routine · ' + String(b.reason).slice(0, 60), 'addTab', name + '!A13', b.model_tab, title);
+    return { ok: true, channel_id: channelId(name, 'A') };
+  },
+  // Dati ChatGPT Ads della routine notturna (speso del mese, clic come lead, budget giornaliero, stato).
+  saveChatgpt: function (b) {
+    var bad = validatePayload('saveGoogle', b);
+    if (bad) return { ok: false, error: bad };
+    var loc = locateChecked(b.channel_id, b.title);
+    if (loc.block.kind !== 'chatgpt') return { ok: false, error: 'il blocco ' + b.channel_id + ' non è un blocco ChatGPT' };
+    return saveChannelRow('routine', 'saveChatgpt', 'CHATGPT', b);
   },
   // Etichette dei mesi diventate date nello Sheet: tornano testo, solo se ogni riga è il mese giusto (testo o data).
   fixMonthLabels: function (b) {

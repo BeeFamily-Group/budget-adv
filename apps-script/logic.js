@@ -42,6 +42,14 @@ function num(v) {
   return isNaN(n) ? null : n;
 }
 
+// Tipo di canale dal titolo del blocco: Meta, ChatGPT Ads (dall'11/11, Color Holiday - Chatgpt ADS) o Google.
+function channelKind(title) {
+  var t = String(title);
+  if (/FACEBOOK/i.test(t)) return 'meta';
+  if (/CHATGPT/i.test(t)) return 'chatgpt';
+  return 'google';
+}
+
 function findBlocks(grid) {
   var row = grid[LAYOUT.titleRow - 1] || [];
   var out = [];
@@ -51,7 +59,7 @@ function findBlocks(grid) {
       out.push({
         col: c + 1,
         letter: colLetter(c + 1),
-        kind: /FACEBOOK/i.test(v) ? 'meta' : 'google',
+        kind: channelKind(v),
         title: v.split(' - metodo')[0].trim(),
       });
     }
@@ -112,7 +120,7 @@ function roleFromCode(code, hashes, hasher) {
 }
 
 function canEditChannel(role, kind) {
-  return (role === 'francesco' && kind === 'meta') || (role === 'marco' && kind === 'google');
+  return (role === 'francesco' && (kind === 'meta' || kind === 'chatgpt')) || (role === 'marco' && kind === 'google');
 }
 
 function canWriteNote(role, author) {
@@ -130,7 +138,8 @@ function planWriteMode(role, kind, ym, nowYm) {
 // Stessa etichetta della pagina (viewmodel.js channelLabel): serve alla nota automatica della proposta.
 function channelShort(title) {
   var t = String(title).toUpperCase();
-  var base = t.indexOf('FACEBOOK') !== -1 ? 'Meta' : 'Google';
+  var kind = channelKind(t);
+  var base = kind === 'meta' ? 'Meta' : (kind === 'chatgpt' ? 'ChatGPT' : 'Google');
   var tags = [['ITALIA', 'Italia'], ['ESTERO', 'estero'], ['GAS', 'GAS'], ['VILLE', 'ville'], ['BARCA', 'barca']];
   for (var i = 0; i < tags.length; i++) if (t.indexOf(tags[i][0]) !== -1) return base + ' ' + tags[i][1];
   return base;
@@ -361,6 +370,7 @@ function labelMatches(v, ym) {
 }
 
 var COL_RE = /^[A-Z]{1,2}$/;
+var ADS_TITLE_RE = /(GOOGLE|FACEBOOK|CHATGPT) ADS$/;
 function validateAddBlock(b) {
   b = b || {};
   if (!given(b.reason)) return 'manca il motivo';
@@ -368,7 +378,25 @@ function validateAddBlock(b) {
   if (!COL_RE.test(String(b.from_letter || '')) || !COL_RE.test(String(b.to_letter || ''))) return 'colonna non valida (lettere maiuscole, es. S)';
   var t = String(b.title || '').trim();
   if (/metodo/i.test(t)) return 'titolo senza " - metodo di pagamento": lo aggiunge la web app';
-  if (!/(GOOGLE|FACEBOOK) ADS$/.test(t)) return 'il titolo finisce con GOOGLE ADS o FACEBOOK ADS';
+  if (!ADS_TITLE_RE.test(t)) return 'il titolo finisce con GOOGLE ADS, FACEBOOK ADS o CHATGPT ADS';
+  if (b.prev) {
+    if (!isIntIn(b.prev.year, 2020, 2100)) return 'anno precedente non valido';
+    if (!isAmount(b.prev.programmed) || !isAmount(b.prev.spent)) return "importo dell'anno precedente non valido";
+  }
+  return '';
+}
+
+// Tab cliente nuovo copiato da un modello con un solo blocco (11/11: Color Holiday - Chatgpt ADS).
+function validateAddTab(b) {
+  b = b || {};
+  if (!given(b.reason)) return 'manca il motivo';
+  if (!given(b.model_tab)) return 'manca il tab modello';
+  var tab = String(b.tab || '').trim();
+  if (!tab || tab.length > 60 || tab.indexOf('|') !== -1) return 'nome del tab non valido (da 1 a 60 caratteri, senza |)';
+  if (!String(b.header_title || '').trim()) return 'manca il titolo in A1';
+  var t = String(b.block_title || '').trim();
+  if (/metodo/i.test(t)) return 'titolo senza " - metodo di pagamento": lo aggiunge la web app';
+  if (!ADS_TITLE_RE.test(t)) return 'il titolo del blocco finisce con GOOGLE ADS, FACEBOOK ADS o CHATGPT ADS';
   if (b.prev) {
     if (!isIntIn(b.prev.year, 2020, 2100)) return 'anno precedente non valido';
     if (!isAmount(b.prev.programmed) || !isAmount(b.prev.spent)) return "importo dell'anno precedente non valido";
@@ -384,5 +412,6 @@ if (typeof module !== 'undefined') {
     spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, validatePlanBatch: validatePlanBatch, titleMismatch: titleMismatch, dueRequests: dueRequests, expiredRequests: expiredRequests, resultStatus: resultStatus,
     chunkText: chunkText, bootstrapClosed: bootstrapClosed, ymOf: ymOf,
     colIndex: colIndex, newBlockGrid: newBlockGrid, extendTotal: extendTotal, validateAddBlock: validateAddBlock, BLOCK: BLOCK, labelMatches: labelMatches,
+    channelKind: channelKind, channelShort: channelShort, validateAddTab: validateAddTab,
   };
 }

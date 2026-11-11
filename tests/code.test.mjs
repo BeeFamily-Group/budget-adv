@@ -50,9 +50,18 @@ class FakeSheet {
       setValues: function (vals) { vals.forEach((row, i) => row.forEach((v, j) => { sh.cell(r + i, c + j); sh.values[r + i - 1][c + j - 1] = v; })); return this; },
       getBackgrounds: () => grid((i, j) => sh.bg[i][j]),
       getA1Notation: () => `${letter(c)}${r}`,
+      clearNote: function () { return this; },
+      setFontWeight: function () { return this; },
     };
   }
   appendRow(arr) { this.values.push(arr.slice()); this.bg.push(arr.map(() => '#ffffff')); }
+  setName(n) { this._ss && this._ss._rename(this.name, n); this.name = n; return this; }
+  setFrozenRows() { return this; }
+  copyTo(ss) {
+    const c = new FakeSheet('Copia di ' + this.name, this.values, []);
+    c.bg = this.bg.map(r => r.slice()); c.formulas = { ...this.formulas }; c.widths = { ...this.widths }; c.formats = { ...this.formats };
+    ss._add(c); return c;
+  }
 }
 
 function setupApp() {
@@ -64,9 +73,21 @@ function setupApp() {
     LOG: new FakeSheet('LOG', head(['ts', 'who', 'action', 'cell', 'before', 'after'])),
     GOOGLE: new FakeSheet('GOOGLE', head(['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author'])),
   };
+  const order = Object.keys(sheets);
+  let active = null;
+  const ss = {
+    getSheetByName: (n) => sheets[n] || null,
+    getSheets: () => order.map(n => sheets[n]),
+    _add: (sh) => { sheets[sh.name] = sh; order.push(sh.name); sh._ss = ss; },
+    _rename: (from, to) => { sheets[to] = sheets[from]; delete sheets[from]; order[order.indexOf(from)] = to; },
+    insertSheet: (n, idx) => { const sh = new FakeSheet(n, []); sheets[n] = sh; order.splice(idx, 0, n); sh._ss = ss; return sh; },
+    setActiveSheet: (sh) => { active = sh; return sh; },
+    moveActiveSheet: (pos) => { order.splice(order.indexOf(active.name), 1); order.splice(pos - 1, 0, active.name); },
+    _order: order,
+  };
+  Object.values(sheets).forEach((sh) => { sh._ss = ss; });
   const ctx = {
-    SpreadsheetApp: { getActive: () => ({ getSheetByName: (n) => sheets[n] || null, getSheets: () => Object.values(sheets) }),
-                      CopyPasteType: { PASTE_FORMAT: 'PASTE_FORMAT' } },
+    SpreadsheetApp: { getActive: () => ss, CopyPasteType: { PASTE_FORMAT: 'PASTE_FORMAT' } },
     Utilities: { formatDate: (d, tz, fmt) => (fmt === 'yyyy-MM' ? '2026-11' : '2026-11-09') },
   };
   vm.createContext(ctx);
@@ -235,4 +256,91 @@ test('web app: fixMonthLabels non scrive se un mese non torna o il blocco è cam
   assert.throws(() => app.ROUTINE_ACTIONS.fixMonthLabels({ ...args, title: 'ESTERO GOOGLE ADS' }), /Sheet è cambiato/);
   assert.match(app.ROUTINE_ACTIONS.fixMonthLabels({ ...args, reason: '' }).error, /motivo/);
   assert.equal(sheets.LOG.values.length, 1);
+});
+
+// ---------- ChatGPT Ads (11/11): tab "Color Holiday - Chatgpt ADS" copiato da un tab Color, dati dalla routine ----------
+
+// Tab modello con un solo blocco Meta in colonna A, come i tab Color: testata, totali E4/E5, blocco righe 9-32.
+function colorModel() {
+  const sh = new FakeSheet('Color Test', []);
+  sh.getRange(1, 1).setValue('ANNO 2027 · Color Holiday · Test');
+  sh.getRange(2, 1).setValue('nota del modello');
+  sh.getRange(4, 2).setValue('Budget programmato'); sh.getRange(4, 5).setFormula('=D30');
+  sh.getRange(5, 2).setValue('Budget investito ad oggi'); sh.getRange(5, 5).setFormula('=E30');
+  sh.getRange(6, 2).setValue('Differenza €'); sh.getRange(6, 5).setFormula('=E5-E4');
+  const block = fx.values.slice(8, 32).map(r => r.slice(0, 7));
+  sh.getRange(9, 1, 24, 7).setValues(block);
+  sh.getRange(17, 3).setBackground('#fff2cc');   // un giallo nel modello: nel tab nuovo non deve restare
+  return sh;
+}
+
+function setupWithModel() {
+  const env = setupApp();
+  env.app.SpreadsheetApp.getActive()._add(colorModel());
+  return env;
+}
+
+const NEW_TAB = { reason: 'ChatGPT Ads Color Holiday', model_tab: 'Color Test', tab: 'Color Holiday - Chatgpt ADS',
+  header_title: 'ANNO 2027 · Color Holiday · ChatGPT ADS', header_note: 'Campagna di rete su ChatGPT Ads', block_title: 'BUDGET CHATGPT ADS' };
+
+test('addTab: tab nuovo dal modello, subito dopo, con il blocco ChatGPT pulito', () => {
+  const { app, sheets } = setupWithModel();
+  const r = app.ROUTINE_ACTIONS.addTab(NEW_TAB);
+  assert.deepEqual(plain(r), { ok: true, channel_id: 'Color Holiday - Chatgpt ADS|A' });
+  const ss = app.SpreadsheetApp.getActive();
+  assert.equal(ss._order.indexOf('Color Holiday - Chatgpt ADS'), ss._order.indexOf('Color Test') + 1);
+  const sh = sheets['Color Holiday - Chatgpt ADS'];
+  assert.equal(sh.getRange(1, 1).getValue(), 'ANNO 2027 · Color Holiday · ChatGPT ADS');
+  assert.equal(sh.getRange(2, 1).getValue(), 'Campagna di rete su ChatGPT Ads');
+  assert.equal(sh.getRange(13, 1).getValue(), 'BUDGET CHATGPT ADS - metodo di pagamento:');
+  assert.equal(sh.getRange(15, 1).getValue(), 'Ottobre 2026');
+  assert.equal(sh.getRange(17, 3).getValue(), '');            // €/giorno vuoti
+  assert.equal(sh.getRange(17, 3).getBackground(), null);      // niente giallo copiato
+  assert.equal(sh.getRange(17, 5).getValue(), '');            // spesa vuota
+  assert.equal(sh.getRange(4, 5).getFormula(), '=D30');
+  assert.equal(sh.getRange(5, 5).getFormula(), '=E30');
+  assert.equal(sheets['Color Test'].getRange(1, 1).getValue(), 'ANNO 2027 · Color Holiday · Test');   // modello intatto
+  const st = app.buildState();
+  const s = st.structures.find(x => x.tab === 'Color Holiday - Chatgpt ADS');
+  assert.deepEqual(plain(s.channels.map(c => [c.id, c.kind, c.title])), [['Color Holiday - Chatgpt ADS|A', 'chatgpt', 'BUDGET CHATGPT ADS']]);
+  assert.equal(sheets.LOG.values.at(-1)[2], 'addTab');
+});
+
+test('addTab: rifiuti senza scrivere', () => {
+  const { app, sheets } = setupWithModel();
+  const n = Object.keys(sheets).length;
+  assert.match(app.ROUTINE_ACTIONS.addTab({ ...NEW_TAB, tab: 'Color Test' }).error, /esiste già/);
+  assert.match(app.ROUTINE_ACTIONS.addTab({ ...NEW_TAB, tab: 'GOOGLE' }).error, /servizio/);
+  assert.match(app.ROUTINE_ACTIONS.addTab({ ...NEW_TAB, model_tab: 'Nessuno' }).error, /modello/);
+  assert.match(app.ROUTINE_ACTIONS.addTab({ ...NEW_TAB, model_tab: 'Ciccio' }).error, /un solo blocco/);   // Ciccio ha Meta e Google
+  assert.match(app.ROUTINE_ACTIONS.addTab({ ...NEW_TAB, block_title: 'BUDGET TIKTOK' }).error, /ADS/);
+  assert.equal(Object.keys(sheets).length, n);
+});
+
+test('saveChatgpt: la routine scrive speso e clic del mese nel tab CHATGPT e nella Spesa Effettiva', () => {
+  const { app, sheets } = setupWithModel();
+  app.ROUTINE_ACTIONS.addTab(NEW_TAB);
+  const ch = { channel_id: 'Color Holiday - Chatgpt ADS|A', title: 'BUDGET CHATGPT ADS' };
+  const r = app.ROUTINE_ACTIONS.saveChatgpt({ ...ch, date: '2026-11-10', spent_mtd: 198.74, leads_mtd: 74, daily_budget: 25, active: true });
+  assert.equal(r.ok, true);
+  assert.ok(sheets.CHATGPT, 'tab di servizio CHATGPT creato');
+  assert.deepEqual(plain(sheets.CHATGPT.values[0]), ['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author']);
+  assert.deepEqual(plain(sheets.CHATGPT.values[1].slice(1)), ['Color Holiday - Chatgpt ADS|A', "'2026-11-10", 198.74, 74, 25, true, 'routine']);
+  assert.equal(sheets['Color Holiday - Chatgpt ADS'].getRange(16, 5).getValue(), 198.74);   // Novembre 2026, Spesa Effettiva
+  // il giorno dopo la riga del mese si aggiorna, non se ne aggiunge un'altra
+  app.ROUTINE_ACTIONS.saveChatgpt({ ...ch, date: '2026-11-11', spent_mtd: 216, leads_mtd: 80, daily_budget: 25, active: true });
+  assert.equal(sheets.CHATGPT.values.length, 2);
+  assert.equal(sheets['Color Holiday - Chatgpt ADS'].getRange(16, 5).getValue(), 216);
+  const st = app.buildState();
+  assert.equal(st.chatgpt.length, 1);
+  assert.equal(st.chatgpt[0].spent_mtd, 216);
+});
+
+test('saveChatgpt e saveGoogle: ognuno solo sul suo canale', () => {
+  const { app } = setupWithModel();
+  app.ROUTINE_ACTIONS.addTab(NEW_TAB);
+  const data = { date: '2026-11-10', spent_mtd: 10, leads_mtd: 1, daily_budget: 25, active: true };
+  assert.match(app.ROUTINE_ACTIONS.saveChatgpt({ ...GOOGLE, ...data }).error, /ChatGPT/);
+  assert.equal(app.USER_ACTIONS.saveGoogle('marco', { channel_id: 'Color Holiday - Chatgpt ADS|A', title: 'BUDGET CHATGPT ADS', ...data }).error, 'forbidden');
+  assert.match(app.ROUTINE_ACTIONS.saveChatgpt({ channel_id: 'Color Holiday - Chatgpt ADS|A', title: 'BUDGET CHATGPT ADS', ...data, spent_mtd: -1 }).error, /speso/);
 });

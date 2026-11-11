@@ -295,3 +295,32 @@ test('etichetta del mese: testo uguale o data dello stesso mese (lo Sheet può c
   assert.equal(L.labelMatches('', '2026-12'), false);
   assert.equal(L.labelMatches(null, '2026-12'), false);
 });
+
+// ChatGPT Ads (11/11): terzo canale, per Color Holiday - Chatgpt ADS. Si riconosce dal titolo del blocco.
+test('canale ChatGPT: riconosciuto dal titolo, lo gestisce Francesco, etichetta ChatGPT', () => {
+  const grid = Array.from({ length: 32 }, () => []);
+  grid[12][0] = 'BUDGET CHATGPT ADS - metodo di pagamento:';
+  assert.deepEqual(L.findBlocks(grid).map(b => [b.letter, b.kind, b.title]), [['A', 'chatgpt', 'BUDGET CHATGPT ADS']]);
+  assert.equal(L.canEditChannel('francesco', 'chatgpt'), true);
+  assert.equal(L.canEditChannel('marco', 'chatgpt'), false);
+  assert.equal(L.planWriteMode('ambra', 'chatgpt', '2026-12', '2026-11'), 'proposal');
+  assert.equal(L.channelShort('BUDGET CHATGPT ADS'), 'ChatGPT');
+  assert.equal(L.channelShort('BUDGET FACEBOOK ADS'), 'Meta');
+  assert.equal(L.channelShort('ESTERO GOOGLE ADS'), 'Google estero');
+  const ok = { reason: 'r', tab: 'T', from_letter: 'A', to_letter: 'J', title: 'BUDGET CHATGPT ADS' };
+  assert.equal(L.validateAddBlock(ok), '');
+});
+
+test('validateAddTab: controlli prima di creare un tab cliente nuovo', () => {
+  const ok = { reason: 'ChatGPT Ads Color', model_tab: 'Color Alexandra Plaza', tab: 'Color Holiday - Chatgpt ADS',
+    header_title: 'ANNO 2027 · Color Holiday · ChatGPT ADS', header_note: 'nota', block_title: 'BUDGET CHATGPT ADS' };
+  assert.equal(L.validateAddTab(ok), '');
+  assert.equal(L.validateAddTab({ ...ok, header_note: undefined }), '');
+  assert.match(L.validateAddTab({ ...ok, reason: '' }), /motivo/);
+  assert.match(L.validateAddTab({ ...ok, model_tab: '' }), /modello/);
+  assert.match(L.validateAddTab({ ...ok, tab: '  ' }), /nome del tab/);
+  assert.match(L.validateAddTab({ ...ok, tab: 'x'.repeat(61) }), /nome del tab/);
+  assert.match(L.validateAddTab({ ...ok, tab: 'Rete|ChatGPT' }), /nome del tab/);
+  assert.match(L.validateAddTab({ ...ok, header_title: '' }), /titolo/);
+  assert.match(L.validateAddTab({ ...ok, block_title: 'BUDGET TIKTOK' }), /ADS/);
+});

@@ -20,5 +20,5 @@ Cartella di lavoro: "~/Desktop/CLAUDE CODE/BEEFAMILY/DASHBOARD BUDGET/budget-adv
 
 3. Esegui: cd "$HOME/Desktop/CLAUDE CODE/BEEFAMILY/DASHBOARD BUDGET/budget-adv" && bash tools/run_nightly.sh finish
 
-4. Chiudi con UNA riga: data dei dati, account letti e falliti, righe nuove nella mappa, celle di spesa scritte, esito della pubblicazione.
+4. Chiudi con UNA riga: data dei dati, account letti e falliti, righe nuove nella mappa, celle di spesa scritte, esito ChatGPT Ads (riga "chatgpt:"), esito della pubblicazione.
    Se lo script esce con codice 3 (nessun account letto) scrivilo chiaramente: la dashboard resta ai dati del giorno prima.
