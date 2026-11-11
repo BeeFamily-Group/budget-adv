@@ -130,9 +130,17 @@ function tilesHtml(d) {
   return `<div class="tiles">
       <div class="tile"><div class="l">Speso nel mese</div><div class="v">${fmtEur(t.spend)}</div><div class="d">${pct === null ? 'Meta + Google' : `${pct}% del programmato`}</div></div>
       <div class="tile"><div class="l">Programmato</div><div class="v">${fmtEur(prog)}</div><div class="d">${d.channels.map(c => channelLabel(c.title)).join(' + ')}</div></div>
-      <div class="tile"><div class="l">Lead nel mese</div><div class="v">${t.leads.toLocaleString('it-IT')}</div><div class="d">Meta + Google</div></div>
-      <div class="tile"><div class="l">Costo per lead</div><div class="v">${eur2(t.cpl)}</div><div class="d">nel mese</div></div>
+      ${onlyChatgpt(d) ? clickTiles(d.results.month.chatgpt) : `<div class="tile"><div class="l">Lead nel mese</div><div class="v">${t.leads.toLocaleString('it-IT')}</div><div class="d">Meta + Google</div></div>
+      <div class="tile"><div class="l">Costo per lead</div><div class="v">${eur2(t.cpl)}</div><div class="d">nel mese</div></div>`}
     </div>`;
+}
+
+// Struttura con il solo ChatGPT Ads (Color Holiday - Chatgpt ADS): niente lead, si guardano i clic.
+const onlyChatgpt = (d) => d.channels.length > 0 && d.channels.every(c => c.kind === 'chatgpt');
+function clickTiles(m) {
+  const clicks = m ? m.clicks : 0;
+  return `<div class="tile"><div class="l">Clic nel mese</div><div class="v">${clicks.toLocaleString('it-IT')}</div><div class="d">ChatGPT Ads</div></div>
+      <div class="tile"><div class="l">Costo per clic</div><div class="v">${clicks > 0 ? eur2(m.spend / clicks) : '—'}</div><div class="d">nel mese</div></div>`;
 }
 
 // Budget complessivo: tutto il piano dello Sheet (ott 2026 – dic 2027), programmato e speso finora.
@@ -198,7 +206,7 @@ function resultsBox(d) {
   const showGoogle = kinds.has('google') || !m.chatgpt;
   const gpt = m.chatgpt ? `<tr><td><span class="plat chatgpt"><i></i>ChatGPT</span></td><td>${fmtEur(m.chatgpt.spend)}</td><td>—</td><td>—</td></tr>` : '';
   const gptNote = m.chatgpt ? `<p class="small" style="margin:8px 0 0">ChatGPT Ads: ${m.chatgpt.clicks} clic${m.chatgpt.clicks > 0 ? `, ${eur2(m.chatgpt.spend / m.chatgpt.clicks)} a clic` : ''}. I clic non sono lead: restano fuori dal costo per lead.</p>` : '';
-  return `<div class="box"><div class="box-head"><div><h2>Risultati di ${monthLong(d.ym)}</h2><p class="small">Google con i numeri inseriti da Marco.</p></div></div>
+  return `<div class="box"><div class="box-head"><div><h2>Risultati di ${monthLong(d.ym)}</h2>${showGoogle ? '<p class="small">Google con i numeri inseriti da Marco.</p>' : ''}</div></div>
       <div class="scroll-x"><table class="t"><thead><tr><th>Canale</th><th>Spesa</th><th>Lead</th><th>Costo per lead</th></tr></thead><tbody>
         ${showMeta ? `<tr><td><span class="plat meta"><i></i>Meta</span></td><td>${fmtEur(m.meta.spend)}</td><td>${m.meta.leads}</td><td>${cpl(m.meta.spend, m.meta.leads)}</td></tr>` : ''}
         ${showGoogle ? `<tr><td><span class="plat google"><i></i>Google</span></td><td>${fmtEur(m.google.spend)}</td><td>${m.google.leads}</td><td>${cpl(m.google.spend, m.google.leads)}</td></tr>` : ''}
