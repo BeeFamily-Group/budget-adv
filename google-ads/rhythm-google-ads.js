@@ -8,6 +8,9 @@
  *
  * Prima volta: CONFIG.ANTEPRIMA = true, si esegue con "Anteprima" e si controlla il registro.
  * Se i numeri tornano: ANTEPRIMA = false e pianificazione giornaliera (es. ogni giorno alle 6).
+ *
+ * Account fuori dall'MCC (es. B612, dall'11/11): la stessa copia si incolla anche dentro l'account del cliente,
+ * con il suo ID nella riga del blocco. Lì lo script legge solo quell'account.
  */
 
 var CONFIG = {
@@ -165,29 +168,48 @@ function main() {
   var ids = Object.keys(perAccount);
   if (!ids.length) { Logger.log('Nessun account configurato.'); return; }
 
+  // Account singolo (11/11, per B612 che non è sotto l'MCC): se lo script gira dentro l'account di un cliente
+  // configurato in BLOCCHI, legge solo quell'account. È la stessa copia dello script, incollata anche lì.
+  var corrente = AdsApp.currentAccount();
+  var idCorrente = corrente.getCustomerId();
+  if (perAccount[idCorrente]) {
+    Logger.log('Account singolo ' + idCorrente + ': leggo solo questo account');
+    elabora(corrente, perAccount[idCorrente], p);
+    return;
+  }
+  if (typeof AdsManagerApp === 'undefined') {
+    throw new Error('Script dentro il singolo account ' + idCorrente + ': manca questo ID nel campo account del blocco della struttura');
+  }
+
   var trovati = {};
   var it = AdsManagerApp.accounts().withIds(ids).get();
   while (it.hasNext()) {
     var acc = it.next();
-    var id = acc.getCustomerId();
-    trovati[id] = true;
+    trovati[acc.getCustomerId()] = true;
     AdsManagerApp.select(acc);
-    if (acc.getCurrencyCode() !== 'EUR') { Logger.log(id + ': valuta ' + acc.getCurrencyCode() + ', saltato'); continue; }
-    var spesa = leggiSpesa(p);
-    var campagne = leggiCampagne();
-    var doppie = sovrapposizioni(perAccount[id], campagne.map(function (c) { return c.nome; }));
-    if (doppie.length) Logger.log('ATTENZIONE ' + id + ': campagne contate in più blocchi: ' + doppie.join(', '));
-    perAccount[id].forEach(function (b) {
-      var carico = riepilogo(b, spesa, campagne, p.a);
-      if (!carico) { Logger.log(b.channel_id + ': nessuna campagna abbinata in ' + id + ', niente invio (controlla campagne/escludi)'); return; }
-      var riga = b.channel_id + ': speso ' + carico.spent_mtd + ' € · conversioni ' + carico.leads_mtd +
-        ' · budget ' + carico.daily_budget + ' €/g · ' + (carico.active ? 'attivo' : 'fermo');
-      if (CONFIG.ANTEPRIMA) { Logger.log('[anteprima] ' + riga); return; }
-      var r = invia(carico);
-      Logger.log((r.ok ? 'OK ' : 'ERRORE ') + riga + (r.ok ? (r.sheet && r.sheet !== 'aggiornato' ? ' (Sheet: ' + r.sheet + ')' : '') : ' → ' + r.error));
-    });
+    elabora(acc, perAccount[acc.getCustomerId()], p);
   }
-  ids.filter(function (i) { return !trovati[i]; }).forEach(function (i) { Logger.log(i + ': account non trovato sotto questo MCC'); });
+  ids.filter(function (i) { return !trovati[i]; }).forEach(function (i) {
+    Logger.log(i + ': account non sotto questo MCC (va bene se ha una copia dello script nel suo account, come B612)');
+  });
+}
+
+function elabora(acc, blocchi, p) {
+  var id = acc.getCustomerId();
+  if (acc.getCurrencyCode() !== 'EUR') { Logger.log(id + ': valuta ' + acc.getCurrencyCode() + ', saltato'); return; }
+  var spesa = leggiSpesa(p);
+  var campagne = leggiCampagne();
+  var doppie = sovrapposizioni(blocchi, campagne.map(function (c) { return c.nome; }));
+  if (doppie.length) Logger.log('ATTENZIONE ' + id + ': campagne contate in più blocchi: ' + doppie.join(', '));
+  blocchi.forEach(function (b) {
+    var carico = riepilogo(b, spesa, campagne, p.a);
+    if (!carico) { Logger.log(b.channel_id + ': nessuna campagna abbinata in ' + id + ', niente invio (controlla campagne/escludi)'); return; }
+    var riga = b.channel_id + ': speso ' + carico.spent_mtd + ' € · conversioni ' + carico.leads_mtd +
+      ' · budget ' + carico.daily_budget + ' €/g · ' + (carico.active ? 'attivo' : 'fermo');
+    if (CONFIG.ANTEPRIMA) { Logger.log('[anteprima] ' + riga); return; }
+    var r = invia(carico);
+    Logger.log((r.ok ? 'OK ' : 'ERRORE ') + riga + (r.ok ? (r.sheet && r.sheet !== 'aggiornato' ? ' (Sheet: ' + r.sheet + ')' : '') : ' → ' + r.error));
+  });
 }
 
 if (typeof module !== 'undefined') {

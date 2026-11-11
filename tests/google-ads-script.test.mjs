@@ -126,7 +126,7 @@ test('giro completo: legge l\'account, separa i blocchi e invia a saveGoogle con
     Logger: { log: (m) => logs.push(String(m)) },
     Utilities: { formatDate: () => '2026-11-09' },
     AdsManagerApp: { accounts: () => ({ withIds: (ids) => ({ get: () => iter(ids.includes('111-222-3333') ? [account] : []) }) }), select: () => {} },
-    AdsApp: { search: (q) => iter(q.includes('segments.date')
+    AdsApp: { currentAccount: () => ({ getCustomerId: () => '999-000-0000', getCurrencyCode: () => 'EUR' }), search: (q) => iter(q.includes('segments.date')
       ? [{ campaign: { name: 'Cristallo Search IT' }, metrics: { costMicros: '120500000', conversions: 4.4 } },
          { campaign: { name: '[ESTERO] Cristallo DE' }, metrics: { costMicros: '80000000', conversions: 1 } }]
       : [{ campaign: { name: 'Cristallo Search IT', status: 'ENABLED', servingStatus: 'SERVING' }, campaignBudget: { resourceName: 'b1', period: 'DAILY', amountMicros: '15000000' } },
@@ -144,4 +144,45 @@ test('giro completo: legge l\'account, separa i blocchi e invia a saveGoogle con
   ]);
   assert.ok(logs.some(l => l.startsWith('Periodo 2026-11-01 → 2026-11-08')));
   assert.ok(!logs.some(l => l.startsWith('ATTENZIONE')));
+});
+
+// B612 (11/11): l'account non è sotto l'MCC di Marco, che lo gestisce entrando dall'account del cliente.
+// La stessa copia dello script, incollata dentro quell'account, legge solo l'account in cui gira, senza MCC.
+function singleCtx({ currentId, sent, logs }) {
+  const iter = (arr) => { let i = 0; return { hasNext: () => i < arr.length, next: () => arr[i++] }; };
+  return {
+    Logger: { log: (m) => logs.push(String(m)) },
+    Utilities: { formatDate: () => '2026-11-12' },
+    AdsApp: {
+      currentAccount: () => ({ getCustomerId: () => currentId, getCurrencyCode: () => 'EUR' }),
+      search: (q) => iter(q.includes('segments.date')
+        ? [{ campaign: { name: 'B612 Mercatini Search' }, metrics: { costMicros: '45000000', conversions: 2.6 } }]
+        : [{ campaign: { name: 'B612 Mercatini Search', status: 'ENABLED', servingStatus: 'SERVING' }, campaignBudget: { resourceName: 'b9', period: 'DAILY', amountMicros: '5000000' } }]),
+    },
+    UrlFetchApp: { fetch: (url, opt) => { sent.push(JSON.parse(opt.payload)); return { getContentText: () => '{"ok":true,"sheet":"aggiornato"}', getResponseCode: () => 200 }; } },
+  };
+}
+
+test('account singolo (B612): dentro l\'account del cliente legge solo quello, senza MCC', () => {
+  const src = readFileSync(new URL('../google-ads/rhythm-google-ads.js', import.meta.url), 'utf8');
+  const sent = [];
+  const logs = [];
+  const ctx = singleCtx({ currentId: '444-555-6666', sent, logs });
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  vm.runInContext("CONFIG.ANTEPRIMA = false; CONFIG.CODICE = 'MAR-PROVA'; CONFIG.BLOCCHI.forEach(function (b) { if (b.channel_id === 'B612|J') b.account = '444-555-6666'; if (b.channel_id.indexOf('Cristallo') === 0) b.account = '111-222-3333'; });", ctx);
+  vm.runInContext('main()', ctx);
+  assert.deepEqual(JSON.parse(JSON.stringify(sent)), [
+    { channel_id: 'B612|J', title: 'BUDGET GOOGLE ADS', date: '2026-11-11', spent_mtd: 45, leads_mtd: 3, daily_budget: 5, active: true, action: 'saveGoogle', code: 'MAR-PROVA' },
+  ]);
+  assert.ok(logs.some(l => l.startsWith('Account singolo 444-555-6666')));
+});
+
+test('account singolo senza il suo ID in nessun blocco: errore che dice quale ID manca', () => {
+  const src = readFileSync(new URL('../google-ads/rhythm-google-ads.js', import.meta.url), 'utf8');
+  const ctx = singleCtx({ currentId: '444-555-6666', sent: [], logs: [] });
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  vm.runInContext("CONFIG.BLOCCHI.forEach(function (b) { if (b.channel_id === 'Arianna|J') b.account = '111-222-3333'; });", ctx);
+  assert.throws(() => vm.runInContext('main()', ctx), /444-555-6666/);
 });

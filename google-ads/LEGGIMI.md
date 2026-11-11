@@ -38,6 +38,18 @@ Le campagne che vanno nel secondo blocco hanno un'etichetta tra parentesi quadre
 
 Le campagne senza etichetta vanno nel blocco principale (Google, ville). Maiuscole e minuscole indifferenti. Lo script è già configurato così.
 
+## Account fuori dall'MCC: B612 (11/11/2026)
+
+L'account Google di B612 non è collegato all'MCC: Marco lo gestisce entrando dall'account del cliente. Lo script dell'MCC quindi non lo vede.
+
+La soluzione è la stessa copia dello script, incollata una seconda volta dentro l'account di B612:
+
+1. Nell'account Google Ads di B612: Strumenti → Azioni collettive → Script → **+**. Serve un accesso almeno "Standard" a quell'account.
+2. Incollare l'ultima versione di `rhythm-google-ads.js`, con lo stesso `CODICE` e l'ID di B612 nella riga `B612|J`, tra gli apici. Le altre righe possono restare vuote.
+3. Anteprima, controllo del registro (riga "Account singolo …"), poi `ANTEPRIMA: false` e pianificazione ogni giorno tra le 6 e le 7, come nell'MCC.
+
+Nella copia dell'MCC la riga `B612|J` può restare vuota. Se ha l'ID, il registro dell'MCC scrive solo che l'account non è sotto l'MCC, senza errori.
+
 ## Cosa sapere
 
 - **Lead Google** = colonna "Conversioni" di Google Ads nel periodo, arrotondata all'intero.
