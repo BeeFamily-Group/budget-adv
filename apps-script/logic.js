@@ -349,6 +349,17 @@ function extendTotal(formula, ref) {
   return parts.indexOf(String(ref).toUpperCase()) !== -1 ? f : f + '+' + ref;
 }
 
+// Etichetta del mese nella colonna "Mese": il testo giusto, oppure una data dello stesso mese
+// (lo Sheet può convertire "Dicembre 2026" in data, com'è successo l'11/11 sul blocco nuovo di Albatros).
+function labelMatches(v, ym) {
+  if (v && typeof v.getTime === 'function') {
+    var d = new Date(v.getTime() + 12 * 3600 * 1000);   // mezzanotte di qualsiasi fuso cade nello stesso giorno
+    var m = d.getUTCMonth() + 1;
+    return d.getUTCFullYear() + '-' + (m < 10 ? '0' : '') + m === ym;
+  }
+  return String(v === undefined || v === null ? '' : v).trim() === monthLabel(ym);
+}
+
 var COL_RE = /^[A-Z]{1,2}$/;
 function validateAddBlock(b) {
   b = b || {};
@@ -372,6 +383,6 @@ if (typeof module !== 'undefined') {
     roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote, planWriteMode: planWriteMode, proposalNote: proposalNote,
     spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, validatePlanBatch: validatePlanBatch, titleMismatch: titleMismatch, dueRequests: dueRequests, expiredRequests: expiredRequests, resultStatus: resultStatus,
     chunkText: chunkText, bootstrapClosed: bootstrapClosed, ymOf: ymOf,
-    colIndex: colIndex, newBlockGrid: newBlockGrid, extendTotal: extendTotal, validateAddBlock: validateAddBlock, BLOCK: BLOCK,
+    colIndex: colIndex, newBlockGrid: newBlockGrid, extendTotal: extendTotal, validateAddBlock: validateAddBlock, BLOCK: BLOCK, labelMatches: labelMatches,
   };
 }

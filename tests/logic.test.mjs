@@ -284,3 +284,14 @@ test('controlli di addBlock', () => {
   assert.match(L.validateAddBlock({ ...ok, prev: { year: 26, programmed: 1, spent: 1 } }), /anno/);
   assert.match(L.validateAddBlock({ ...ok, prev: { year: 2026, programmed: -1, spent: 1 } }), /importo/);
 });
+
+test('etichetta del mese: testo uguale o data dello stesso mese (lo Sheet può convertire "Dicembre 2026" in data)', () => {
+  assert.equal(L.labelMatches('Dicembre 2026', '2026-12'), true);
+  assert.equal(L.labelMatches(' Dicembre 2026 ', '2026-12'), true);
+  assert.equal(L.labelMatches(new Date(Date.UTC(2026, 11, 1, 8)), '2026-12'), true);    // mezzanotte di un fuso a ovest
+  assert.equal(L.labelMatches(new Date(Date.UTC(2026, 10, 30, 23)), '2026-12'), true);  // mezzanotte a Roma
+  assert.equal(L.labelMatches(new Date(Date.UTC(2026, 10, 15)), '2026-12'), false);
+  assert.equal(L.labelMatches('Novembre 2026', '2026-12'), false);
+  assert.equal(L.labelMatches('', '2026-12'), false);
+  assert.equal(L.labelMatches(null, '2026-12'), false);
+});

@@ -17,6 +17,7 @@ class FakeSheet {
     this.bg = values.map((r, i) => r.map((_, j) => (bg[i] && bg[i][j]) || '#ffffff'));
     this.formulas = {};
     this.widths = {};
+    this.formats = {};
   }
   getColumnWidth(c) { return this.widths[c] || 100; }
   setColumnWidth(c, w) { this.widths[c] = w; return this; }
@@ -35,6 +36,7 @@ class FakeSheet {
       getValue: () => { sh.cell(r, c); return sh.values[r - 1][c - 1]; },
       setValue: function (v) { sh.cell(r, c); sh.values[r - 1][c - 1] = v; return this; },
       setBackground: function (v) { grid((i, j) => { sh.bg[i][j] = v; }); return this; },
+      setNumberFormat: function (f) { grid((i, j) => { sh.formats[`${i + 1},${j + 1}`] = f; }); return this; },
       getFormula: () => sh.formulas[`${r},${c}`] || '',
       setFormula: function (f) { sh.cell(r, c); sh.formulas[`${r},${c}`] = f; sh.values[r - 1][c - 1] = f; return this; },
       // solo PASTE_FORMAT: nel finto il formato è il colore di sfondo
@@ -201,5 +203,36 @@ test('web app: addBlock non scrive niente se qualcosa non torna', () => {
   assert.match(app.ROUTINE_ACTIONS.addBlock(EST).error, /formula/);
   assert.equal(sheets.Ciccio.getRange(13, 19).getValue(), '');
   assert.equal(sheets.Ciccio.getRange(5, 5).getFormula(), '=E30+N30');
+  assert.equal(sheets.LOG.values.length, 1);
+});
+
+test('web app: etichette dei mesi diventate date nello Sheet, fixMonthLabels le rimette come testo', () => {
+  const { app, sheets } = setupApp();
+  withTotals(sheets);
+  app.ROUTINE_ACTIONS.addBlock(EST);
+  assert.equal(sheets.Ciccio.formats['15,19'], '@');   // addBlock scrive le etichette come testo
+  assert.equal(sheets.Ciccio.formats['29,19'], '@');
+  // com'è successo l'11/11 sullo Sheet vero, prima di questa correzione: "Dicembre 2026" letto come data
+  sheets.Ciccio.getRange(DEC, 19).setValue(new Date(Date.UTC(2026, 11, 1, 8)));
+  const item = { channel_id: 'Ciccio|S', title: 'ESTERO GOOGLE ADS', ym: '2026-12', eur: 60 };
+  assert.throws(() => app.ROUTINE_ACTIONS.planBatch({ reason: 'prova', items: [item] }), /layout/);
+  const fix = app.ROUTINE_ACTIONS.fixMonthLabels({ reason: 'etichette', channel_id: 'Ciccio|S', title: 'ESTERO GOOGLE ADS' });
+  assert.deepEqual(plain(fix), { ok: true, fixed: 1 });
+  assert.equal(sheets.Ciccio.getRange(DEC, 19).getValue(), 'Dicembre 2026');
+  const log = sheets.LOG.values[sheets.LOG.values.length - 1];
+  assert.deepEqual(plain([log[1], log[2], log[3]]), ['routine · etichette', 'fixMonthLabels', 'Ciccio!S15']);
+  assert.deepEqual(plain(app.ROUTINE_ACTIONS.planBatch({ reason: 'prova', items: [item] })), { ok: true, written: 1 });
+});
+
+test('web app: fixMonthLabels non scrive se un mese non torna o il blocco è cambiato', () => {
+  const { app, sheets } = setupApp();
+  const args = { reason: 'etichette', channel_id: 'Ciccio|J', title: 'BUDGET GOOGLE ADS' };
+  sheets.Ciccio.getRange(DEC, 10).setValue('Gennaio 2027');
+  sheets.Ciccio.getRange(DEC + 1, 10).setValue(new Date(Date.UTC(2027, 0, 1, 8)));
+  assert.match(app.ROUTINE_ACTIONS.fixMonthLabels(args).error, /riga 17/);
+  assert.equal(sheets.Ciccio.getRange(DEC + 1, 10).getValue() instanceof Object, true);   // la data resta com'era
+  assert.equal(sheets.Ciccio.formats['15,10'], undefined);
+  assert.throws(() => app.ROUTINE_ACTIONS.fixMonthLabels({ ...args, title: 'ESTERO GOOGLE ADS' }), /Sheet è cambiato/);
+  assert.match(app.ROUTINE_ACTIONS.fixMonthLabels({ ...args, reason: '' }).error, /motivo/);
   assert.equal(sheets.LOG.values.length, 1);
 });

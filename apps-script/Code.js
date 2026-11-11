@@ -366,6 +366,7 @@ var ROUTINE_ACTIONS = {
     } catch (err) { return { ok: false, error: err.message }; }
     var title = String(b.title).trim();
     sh.getRange(BLOCK.top, from, BLOCK.rows, BLOCK.cols).copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    sh.getRange(LAYOUT.firstRow, to, LAYOUT.count, 1).setNumberFormat('@');   // "Dicembre 2026" resta testo, non diventa una data
     target.setValues(newBlockGrid(to, title, b.prev));
     sh.getRange(LAYOUT.firstRow, to + 2, LAYOUT.count, 1).setBackground(null);   // niente gialli copiati dal modello
     for (var k = 0; k < BLOCK.cols; k++) sh.setColumnWidth(to + k, sh.getColumnWidth(from + k));
@@ -373,6 +374,26 @@ var ROUTINE_ACTIONS = {
     e5.setFormula(f5);
     log('routine · ' + String(b.reason).slice(0, 60), 'addBlock', b.tab + '!' + b.to_letter + '13', '', title);
     return { ok: true, channel_id: channelId(b.tab, b.to_letter) };
+  },
+  // Etichette dei mesi diventate date nello Sheet: tornano testo, solo se ogni riga è il mese giusto (testo o data).
+  fixMonthLabels: function (b) {
+    if (!given(b.reason)) return { ok: false, error: 'manca il motivo' };
+    var loc = locateChecked(b.channel_id, b.title);
+    var col = loc.block.col;
+    var yms = monthsList();
+    var wrong = [];
+    var fixed = 0;
+    yms.forEach(function (ym, k) {
+      var v = (loc.values[LAYOUT.firstRow + k - 1] || [])[col - 1];
+      if (!labelMatches(v, ym)) wrong.push('riga ' + (LAYOUT.firstRow + k));
+      else if (v !== monthLabel(ym)) fixed++;
+    });
+    if (wrong.length) return { ok: false, error: 'etichette dei mesi che non tornano: ' + wrong.join(', ') };
+    var range = loc.sheet.getRange(LAYOUT.firstRow, col, LAYOUT.count, 1);
+    range.setNumberFormat('@');
+    range.setValues(yms.map(function (ym) { return [monthLabel(ym)]; }));
+    if (fixed) log('routine · ' + String(b.reason).slice(0, 60), 'fixMonthLabels', loc.sheet.getName() + '!' + colLetter(col) + LAYOUT.firstRow, fixed + ' date', 'testo');
+    return { ok: true, fixed: fixed };
   },
   pendingRequests: function (b) {
     var today = String(b.now || todayRome()).slice(0, 10);
