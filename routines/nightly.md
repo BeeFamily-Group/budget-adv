@@ -1,4 +1,4 @@
-Routine notturna della dashboard budget ADV BeeFamily (https://beefamily-group.github.io/budget-adv/).
+Routine notturna della dashboard budget ADV BeeFamily (https://rhythm.consulenzaperhotel.it/, prima beefamily-group.github.io/budget-adv/).
 Solo lettura su Meta: non usare ads_update_entity, ads_activate_entity né altri strumenti che modificano.
 
 Cartella di lavoro: "~/Desktop/CLAUDE CODE/BEEFAMILY/DASHBOARD BUDGET/budget-adv" (usa sempre il percorso tra virgolette).
