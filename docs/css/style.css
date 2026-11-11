@@ -336,10 +336,12 @@ textarea:focus { outline: 0; border-color: var(--focus); box-shadow: 0 0 0 3px v
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
 
-/* Schermata gialla (solo se i dati tardano più di 400 ms, vedi js/splash.js): la firma si disegna come una passata di spray,
-   l'adesivo respira mentre scorrono le frasi, poi vola nella barra in alto e il giallo si scioglie. */
+/* Schermata gialla (visibile già nell'HTML, almeno 5 s a ogni apertura, vedi js/splash.js): la firma si disegna come una
+   passata di spray, l'adesivo respira mentre scorrono le frasi, poi vola nella barra in alto e il giallo si scioglie.
+   splash-safety: se lo script non parte, dopo 15 s il giallo si toglie da solo e non blocca la pagina. */
 .splash { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--yel); color: var(--night);
-  animation: splash-in .18s ease-out both; transition: background-color .35s ease-out; }
+  animation: splash-in .18s ease-out both, splash-safety .3s ease-out 15s forwards; transition: background-color .35s ease-out; }
+@keyframes splash-safety { to { opacity: 0; visibility: hidden; } }
 .splash.leaving { background-color: rgba(255, 196, 0, 0); }
 .splash-fly { transition: transform .45s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
 .splash-sticker { display: block; padding: 18px 32px 20px; background: var(--night); border: 4px solid #fff; border-radius: 18px; color: var(--yel);
@@ -354,7 +356,8 @@ textarea:focus { outline: 0; border-color: var(--focus); box-shadow: 0 0 0 3px v
 @keyframes splash-in { from { opacity: 0; } }
 @keyframes splash-tag { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes splash-breath { 0%, 100% { transform: rotate(-7deg) scale(1); } 50% { transform: rotate(-5deg) scale(1.025); } }
-@media (prefers-reduced-motion: reduce) { .splash, .splash-sticker, .splash-word { animation: none; } .splash, .splash-fly { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .splash-sticker, .splash-word { animation: none; } .splash { animation: splash-safety .01s 15s forwards; }
+  .splash, .splash-fly { transition: none; } }
 
 /* Telefono */
 @media (max-width: 860px) {

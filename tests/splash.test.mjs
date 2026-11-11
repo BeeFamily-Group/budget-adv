@@ -25,16 +25,48 @@ function clock() {
   };
 }
 
-function setup() {
+// Le prove "a soglia" passano delay e minVisible espliciti: la logica generica resta valida.
+function setup(opts = { delay: 400, minVisible: 1100 }) {
   const c = clock();
   const calls = [];
   const s = splashTimer({
     show: () => calls.push(['show', c.now()]),
     hide: () => { calls.push(['hide', c.now()]); },
     now: c.now, setTimer: c.setTimer, clearTimer: c.clearTimer,
+    ...opts,
   });
   return { c, calls, s };
 }
+
+// Scelta di Francesco dell'11/11: "5 secondi sempre". Sono i valori predefiniti.
+test('predefinito: la schermata compare subito, senza aspettare un timer', () => {
+  const { calls, s } = setup({});
+  s.start();
+  assert.deepEqual(calls, [['show', 0]]);
+});
+
+test('predefinito: dati pronti in 300 ms, la schermata resta comunque 5 s', async () => {
+  const { c, calls, s } = setup({});
+  s.start();
+  c.advance(300);
+  const p = s.done();
+  c.advance(4699);
+  await flush();
+  assert.deepEqual(calls, [['show', 0]]);
+  c.advance(1);
+  await p;
+  assert.deepEqual(calls, [['show', 0], ['hide', 5000]]);
+});
+
+test('predefinito: dati lenti oltre 5 s, la schermata resta fino al loro arrivo', async () => {
+  const { c, calls, s } = setup({});
+  s.start();
+  c.advance(7200);
+  const p = s.done();
+  c.advance(0);
+  await p;
+  assert.deepEqual(calls, [['show', 0], ['hide', 7200]]);
+});
 
 const flush = () => new Promise((r) => setImmediate(r));
 
@@ -88,6 +120,7 @@ test('done aspetta la fine dell\'uscita animata', async () => {
     show: () => {},
     hide: () => new Promise((r) => c.setTimer(() => { exited = true; r(); }, 450)),
     now: c.now, setTimer: c.setTimer, clearTimer: c.clearTimer,
+    delay: 400, minVisible: 1100,
   });
   s.start();
   c.advance(3000);

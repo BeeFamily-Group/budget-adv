@@ -1,14 +1,16 @@
 // Schermata gialla di caricamento (proposta B "Tag", 11/11/2026): firma spray che si disegna, frasi di attesa,
-// poi l'adesivo vola nella barra in alto. Compare solo se i dati tardano più di 400 ms e resta almeno 1,1 s,
-// il tempo di finire la firma. Solo alla prima apertura: i ricaricamenti dopo un salvataggio non la mostrano.
+// poi l'adesivo vola nella barra in alto. Scelta di Francesco dell'11/11: "5 secondi sempre", cioè compare
+// subito (è già visibile nell'HTML) e resta almeno 5 s anche se i dati arrivano prima; se tardano, resta fino
+// al loro arrivo. Solo alla prima apertura: i ricaricamenti dopo un salvataggio non la mostrano.
 
-// Logica dei tempi, separata dal DOM per poterla provare in node.
-export function splashTimer({ show, hide, now, setTimer, clearTimer, delay = 400, minVisible = 1100 }) {
+// Logica dei tempi, separata dal DOM per poterla provare in node. Con delay 0 la schermata parte subito.
+export function splashTimer({ show, hide, now, setTimer, clearTimer, delay = 0, minVisible = 5000 }) {
   let timer = null;
   let shownAt = null;
   let ending = null;
   return {
     start() {
+      if (delay <= 0) { shownAt = now(); show(); return; }
       timer = setTimer(() => { timer = null; shownAt = now(); show(); }, delay);
     },
     done() {
