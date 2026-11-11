@@ -290,6 +290,81 @@ function titleMismatch(block, sent, tab) {
   return 'lo Sheet è cambiato: nel tab ' + tab + ' la colonna ' + block.letter + ' ora è "' + block.title + '". Ricarica la pagina.';
 }
 
+// ---------- Blocco nuovo in un tab cliente (azione di routine addBlock, 11/11: Albatros Google estero) ----------
+
+function colIndex(letter) {
+  var s = String(letter || '').toUpperCase();
+  var n = 0;
+  for (var i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64);
+  return n;
+}
+
+var BLOCK = { top: 9, rows: 24, cols: 7 };   // righe 9-32 (anno precedente, titolo, mesi, totali), 7 colonne
+var BLOCK_HEAD = ['Mese', 'Giorni', '€ / Giorno', '€ Programmati', 'Spesa Effettiva', 'Δ (Spesa - Prog.)', 'Note'];
+var MESI_BREVI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+
+function daysInMonth(ym) {
+  var p = ym.split('-');
+  return new Date(Date.UTC(Number(p[0]), Number(p[1]), 0)).getUTCDate();
+}
+
+// Griglia del blocco che inizia alla colonna col (1-based), dalla riga 9 alla 32, come i blocchi generati il 03/11:
+// anno precedente (se c'è), titolo, intestazioni, mesi interi con €/giorno e spesa vuoti, formule e totali.
+function newBlockGrid(col, title, prev) {
+  var T = colLetter(col + 1), U = colLetter(col + 2), V = colLetter(col + 3), W = colLetter(col + 4);
+  var first = LAYOUT.firstRow;
+  var last = LAYOUT.firstRow + LAYOUT.count - 1;
+  var tot = last + 1;
+  var blank = function () { return ['', '', '', '', '', '', '']; };
+  var p = prev || {};
+  var has = given(p.year);
+  var g = [];
+  g.push(['', has ? Number(p.year) : '', has ? Number(p.year) + 1 : '', '', '', '', '']);
+  g.push(['Programmato', has ? Number(p.programmed) : '', '=' + V + tot, '', '', '', '']);
+  g.push(['Investito', has ? Number(p.spent) : '', '=' + W + tot, '', '', '', '']);
+  g.push(blank());
+  var head = blank();
+  head[0] = title + ' - metodo di pagamento:';
+  g.push(head);
+  g.push(BLOCK_HEAD.slice());
+  var yms = monthsList();
+  yms.forEach(function (ym, k) {
+    var r = first + k;
+    g.push([monthLabel(ym), daysInMonth(ym), '', '=' + U + r + '*' + T + r, '', '=IF(' + W + r + '="","",' + W + r + '-' + V + r + ')', '']);
+  });
+  g.push(['TOTALE', '', '', '=SUM(' + V + first + ':' + V + last + ')', '=SUM(' + W + first + ':' + W + last + ')', '=' + W + tot + '-' + V + tot, '']);
+  var y0 = yms[0].slice(0, 4);
+  var split = first + yms.filter(function (ym) { return ym.slice(0, 4) === y0; }).length;   // prima riga dell'anno dopo
+  var short = function (ym) { return MESI_BREVI[Number(ym.slice(5, 7)) - 1]; };
+  g.push(['di cui ' + short(yms[0]) + '–dic ' + y0, '', '', '=SUM(' + V + first + ':' + V + (split - 1) + ')', '=SUM(' + W + first + ':' + W + (split - 1) + ')', '', '']);
+  g.push(['di cui gen–' + short(yms[yms.length - 1]) + ' ' + (Number(y0) + 1), '', '', '=SUM(' + V + split + ':' + V + last + ')', '=SUM(' + W + split + ':' + W + last + ')', '', '']);
+  return g;
+}
+
+// Totale in testa al tab (E4 programmato, E5 investito): somma dei totali dei blocchi, il nuovo si aggiunge una volta.
+function extendTotal(formula, ref) {
+  var f = String(formula === undefined || formula === null ? '' : formula);
+  if (f.charAt(0) !== '=') throw new Error('il totale in testa al tab non è una formula: da sistemare a mano prima del blocco nuovo');
+  var parts = f.slice(1).split('+').map(function (x) { return x.trim().toUpperCase(); });
+  return parts.indexOf(String(ref).toUpperCase()) !== -1 ? f : f + '+' + ref;
+}
+
+var COL_RE = /^[A-Z]{1,2}$/;
+function validateAddBlock(b) {
+  b = b || {};
+  if (!given(b.reason)) return 'manca il motivo';
+  if (!given(b.tab)) return 'manca il tab';
+  if (!COL_RE.test(String(b.from_letter || '')) || !COL_RE.test(String(b.to_letter || ''))) return 'colonna non valida (lettere maiuscole, es. S)';
+  var t = String(b.title || '').trim();
+  if (/metodo/i.test(t)) return 'titolo senza " - metodo di pagamento": lo aggiunge la web app';
+  if (!/(GOOGLE|FACEBOOK) ADS$/.test(t)) return 'il titolo finisce con GOOGLE ADS o FACEBOOK ADS';
+  if (b.prev) {
+    if (!isIntIn(b.prev.year, 2020, 2100)) return 'anno precedente non valido';
+    if (!isAmount(b.prev.programmed) || !isAmount(b.prev.spent)) return "importo dell'anno precedente non valido";
+  }
+  return '';
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     LAYOUT: LAYOUT, monthsList: monthsList, monthLabel: monthLabel, colLetter: colLetter,
@@ -297,5 +372,6 @@ if (typeof module !== 'undefined') {
     roleFromCode: roleFromCode, canEditChannel: canEditChannel, canWriteNote: canWriteNote, planWriteMode: planWriteMode, proposalNote: proposalNote,
     spendWritable: spendWritable, newMetaRequest: newMetaRequest, validatePayload: validatePayload, validatePlanBatch: validatePlanBatch, titleMismatch: titleMismatch, dueRequests: dueRequests, expiredRequests: expiredRequests, resultStatus: resultStatus,
     chunkText: chunkText, bootstrapClosed: bootstrapClosed, ymOf: ymOf,
+    colIndex: colIndex, newBlockGrid: newBlockGrid, extendTotal: extendTotal, validateAddBlock: validateAddBlock, BLOCK: BLOCK,
   };
 }

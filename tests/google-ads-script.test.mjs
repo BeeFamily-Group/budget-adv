@@ -81,10 +81,10 @@ test('controllo della configurazione', () => {
   assert.equal(bad.errori.length, 2);
 });
 
-test('la configurazione precompilata copre i 20 blocchi Google dello Sheet, account da inserire', () => {
+test('la configurazione precompilata copre i 21 blocchi Google dello Sheet, account da inserire', () => {
   const blocchi = S.CONFIG.BLOCCHI;
-  assert.equal(blocchi.length, 20);
-  assert.equal(new Set(blocchi.map(b => b.channel_id)).size, 20);
+  assert.equal(blocchi.length, 21);   // dall'11/11 anche Albatros estero (Albatros|S)
+  assert.equal(new Set(blocchi.map(b => b.channel_id)).size, 21);
   assert.ok(blocchi.every(b => b.account === ''));
   assert.equal(S.CONFIG.ANTEPRIMA, true);
   assert.equal(S.CONFIG.CODICE, 'INCOLLA_QUI_IL_TUO_CODICE');
@@ -96,7 +96,10 @@ test('standard etichette: [ESTERO], [BARCA], [GAS] nel nome; senza etichetta nel
   const B = Object.fromEntries(S.CONFIG.BLOCCHI.map(b => [b.channel_id, b]));
   const dove = (ids, nome) => ids.filter(id => S.abbina(B[id], nome));
   const CR = ['Cristallo|J', 'Cristallo|S'], SA = ['Sardinia|A', 'Sardinia|J'], TR = ['Trieste|J', 'Trieste|S'];
+  const AL = ['Albatros|J', 'Albatros|S'];
   const casi = [
+    [AL, 'Albatros Search IT', ['Albatros|J']],
+    [AL, '[ESTERO] Albatros DE', ['Albatros|S']],
     [CR, 'Cristallo Search IT', ['Cristallo|J']],
     [CR, '[ESTERO] Cristallo DE', ['Cristallo|S']],
     [SA, 'Sardinia Ville Search', ['Sardinia|A']],

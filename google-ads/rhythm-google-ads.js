@@ -24,7 +24,9 @@ var CONFIG = {
   // Standard per gli account con due blocchi: etichetta all'inizio del nome della campagna,
   // [ESTERO], [BARCA] o [GAS]. Le campagne senza etichetta vanno nel blocco principale.
   BLOCCHI: [
-    { channel_id: 'Albatros|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
+    // Albatros ha due blocchi dall'11/11: Google e Google estero (da metà dicembre a febbraio), [ESTERO] nel nome.
+    { channel_id: 'Albatros|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [], escludi: ['[estero]'] },
+    { channel_id: 'Albatros|S', title: 'ESTERO GOOGLE ADS', account: '', campagne: ['[estero]'] },
     { channel_id: 'Arianna|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'B612|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'Ciccio|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },

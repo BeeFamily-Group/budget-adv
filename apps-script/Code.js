@@ -341,6 +341,39 @@ var ROUTINE_ACTIONS = {
     b.items.forEach(function (it) { writePlanCells(who, 'planBatch', locs[it.channel_id], it, giorniRows); });
     return { ok: true, written: b.items.length };
   },
+  // Blocco nuovo in un tab cliente (11/11: Albatros Google estero). Formato dal blocco modello dello stesso tab,
+  // mesi, giorni e formule da newBlockGrid, totali E4/E5 estesi. Prima tutti i controlli, poi le scritture.
+  addBlock: function (b) {
+    var bad = validateAddBlock(b);
+    if (bad) return { ok: false, error: bad };
+    if (SERVICE_TABS[b.tab]) return { ok: false, error: 'tab di servizio: il blocco va in un tab cliente' };
+    var sh = SpreadsheetApp.getActive().getSheetByName(b.tab);
+    if (!sh) return { ok: false, error: 'tab sconosciuto: ' + b.tab };
+    var from = colIndex(b.from_letter);
+    var to = colIndex(b.to_letter);
+    var blocks = findBlocks(sheetGrid(sh).values);
+    if (!blocks.some(function (x) { return x.col === from; })) return { ok: false, error: 'nessun blocco in colonna ' + b.from_letter + ' da usare come modello' };
+    if (blocks.some(function (x) { return x.col === to; })) return { ok: false, error: "c'è già un blocco in colonna " + b.to_letter };
+    var target = sh.getRange(BLOCK.top, to, BLOCK.rows, BLOCK.cols);
+    var busy = target.getValues().some(function (r) { return r.some(function (v) { return v !== '' && v !== null; }); });
+    if (busy) return { ok: false, error: 'le colonne ' + b.to_letter + '–' + colLetter(to + BLOCK.cols - 1) + ' (righe 9-32) non sono vuote' };
+    var e4 = sh.getRange(4, 5);
+    var e5 = sh.getRange(5, 5);
+    var f4, f5;
+    try {
+      f4 = extendTotal(e4.getFormula(), colLetter(to + 3) + '30');
+      f5 = extendTotal(e5.getFormula(), colLetter(to + 4) + '30');
+    } catch (err) { return { ok: false, error: err.message }; }
+    var title = String(b.title).trim();
+    sh.getRange(BLOCK.top, from, BLOCK.rows, BLOCK.cols).copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    target.setValues(newBlockGrid(to, title, b.prev));
+    sh.getRange(LAYOUT.firstRow, to + 2, LAYOUT.count, 1).setBackground(null);   // niente gialli copiati dal modello
+    for (var k = 0; k < BLOCK.cols; k++) sh.setColumnWidth(to + k, sh.getColumnWidth(from + k));
+    e4.setFormula(f4);
+    e5.setFormula(f5);
+    log('routine · ' + String(b.reason).slice(0, 60), 'addBlock', b.tab + '!' + b.to_letter + '13', '', title);
+    return { ok: true, channel_id: channelId(b.tab, b.to_letter) };
+  },
   pendingRequests: function (b) {
     var today = String(b.now || todayRome()).slice(0, 10);
     var all = rows('RICHIESTE META');

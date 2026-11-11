@@ -15,7 +15,11 @@ class FakeSheet {
     this.name = name;
     this.values = values.map(r => r.slice());
     this.bg = values.map((r, i) => r.map((_, j) => (bg[i] && bg[i][j]) || '#ffffff'));
+    this.formulas = {};
+    this.widths = {};
   }
+  getColumnWidth(c) { return this.widths[c] || 100; }
+  setColumnWidth(c, w) { this.widths[c] = w; return this; }
   getName() { return this.name; }
   getLastRow() { return this.values.length; }
   getLastColumn() { return Math.max(0, ...this.values.map(r => r.length)); }
@@ -30,7 +34,15 @@ class FakeSheet {
     return {
       getValue: () => { sh.cell(r, c); return sh.values[r - 1][c - 1]; },
       setValue: function (v) { sh.cell(r, c); sh.values[r - 1][c - 1] = v; return this; },
-      setBackground: function (v) { sh.cell(r, c); sh.bg[r - 1][c - 1] = v; return this; },
+      setBackground: function (v) { grid((i, j) => { sh.bg[i][j] = v; }); return this; },
+      getFormula: () => sh.formulas[`${r},${c}`] || '',
+      setFormula: function (f) { sh.cell(r, c); sh.formulas[`${r},${c}`] = f; sh.values[r - 1][c - 1] = f; return this; },
+      // solo PASTE_FORMAT: nel finto il formato è il colore di sfondo
+      copyTo: function (dest, type) {
+        if (type !== 'PASTE_FORMAT') throw new Error('copyTo finto: solo PASTE_FORMAT');
+        grid((i, j) => { dest._sheet.cell(dest._r + i - (r - 1), dest._c + j - (c - 1)); dest._sheet.bg[dest._r - 1 + i - (r - 1)][dest._c - 1 + j - (c - 1)] = sh.bg[i][j]; });
+      },
+      _sheet: sh, _r: r, _c: c,
       getBackground: () => { sh.cell(r, c); return sh.bg[r - 1][c - 1]; },
       getValues: () => grid((i, j) => sh.values[i][j]),
       setValues: function (vals) { vals.forEach((row, i) => row.forEach((v, j) => { sh.cell(r + i, c + j); sh.values[r + i - 1][c + j - 1] = v; })); return this; },
@@ -51,7 +63,8 @@ function setupApp() {
     GOOGLE: new FakeSheet('GOOGLE', head(['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author'])),
   };
   const ctx = {
-    SpreadsheetApp: { getActive: () => ({ getSheetByName: (n) => sheets[n] || null, getSheets: () => Object.values(sheets) }) },
+    SpreadsheetApp: { getActive: () => ({ getSheetByName: (n) => sheets[n] || null, getSheets: () => Object.values(sheets) }),
+                      CopyPasteType: { PASTE_FORMAT: 'PASTE_FORMAT' } },
     Utilities: { formatDate: (d, tz, fmt) => (fmt === 'yyyy-MM' ? '2026-11' : '2026-11-09') },
   };
   vm.createContext(ctx);
@@ -141,4 +154,52 @@ test('web app: numeri Google, una riga per blocco e mese (lo script li manda ogn
   assert.equal(old.ok, true);
   assert.equal(old.sheet, 'già presente un dato più recente');
   assert.deepEqual(plain(googleRows(sheets))[0], ['Ciccio|J', "'2026-11-08", 340]);
+});
+
+// Blocco nuovo (Albatros Google estero, 11/11): qui sul tab Ciccio del fixture, che ha le colonne S-Y vuote.
+const EST = { reason: 'Ciccio estero (prova)', tab: 'Ciccio', from_letter: 'J', to_letter: 'S', title: 'ESTERO GOOGLE ADS',
+              prev: { year: 2026, programmed: 4500, spent: 4589 } };
+const withTotals = (sheets) => { sheets.Ciccio.getRange(4, 5).setFormula('=D30+M30'); sheets.Ciccio.getRange(5, 5).setFormula('=E30+N30'); };
+
+test('web app: addBlock crea un blocco Google nuovo che la dashboard legge subito', () => {
+  const { app, sheets } = setupApp();
+  withTotals(sheets);
+  sheets.Ciccio.setColumnWidth(12, 95);
+  sheets.Ciccio.getRange(14, 10).setBackground('#e6b8af');
+  assert.deepEqual(plain(app.ROUTINE_ACTIONS.addBlock(EST)), { ok: true, channel_id: 'Ciccio|S' });
+  const ch = plain(app.buildState()).structures.find(s => s.tab === 'Ciccio').channels.find(c => c.id === 'Ciccio|S');
+  assert.equal(ch.kind, 'google');
+  assert.equal(ch.title, 'ESTERO GOOGLE ADS');
+  assert.deepEqual(ch.prev, { year: 2026, programmed: 4500, spent: 4589 });
+  assert.ok(ch.months.every(m => m.eur === null && m.sheet_spent === null && !m.proposal));   // il giallo del modello non passa
+  assert.equal(ch.months[4].days, 28);                                                     // febbraio 2027
+  assert.equal(sheets.Ciccio.getRange(4, 5).getFormula(), '=D30+M30+V30');
+  assert.equal(sheets.Ciccio.getRange(5, 5).getFormula(), '=E30+N30+W30');
+  assert.equal(sheets.Ciccio.getColumnWidth(21), 95);                                      // U come L
+  assert.equal(sheets.Ciccio.getRange(14, 19).getBackground(), '#e6b8af');                 // formato del modello
+  const log = sheets.LOG.values[sheets.LOG.values.length - 1];
+  assert.deepEqual(plain([log[1], log[2], log[3], log[5]]), ['routine · Ciccio estero (prova)', 'addBlock', 'Ciccio!S13', 'ESTERO GOOGLE ADS']);
+  // poi i mesi si scrivono come sempre
+  const pb = app.ROUTINE_ACTIONS.planBatch({ reason: 'prova', items: [
+    { channel_id: 'Ciccio|S', title: 'ESTERO GOOGLE ADS', ym: '2026-12', eur: 60, days: 17, start_day: 15 }] });
+  assert.deepEqual(plain(pb), { ok: true, written: 1 });
+  assert.equal(sheets.Ciccio.getRange(DEC, 21).getValue(), 60);
+  assert.equal(sheets.Ciccio.getRange(DEC, 20).getValue(), 17);
+});
+
+test('web app: addBlock non scrive niente se qualcosa non torna', () => {
+  const { app, sheets } = setupApp();
+  withTotals(sheets);
+  assert.match(app.ROUTINE_ACTIONS.addBlock({ ...EST, from_letter: 'S' }).error, /nessun blocco/);
+  assert.match(app.ROUTINE_ACTIONS.addBlock({ ...EST, to_letter: 'J' }).error, /già un blocco/);
+  assert.match(app.ROUTINE_ACTIONS.addBlock({ ...EST, tab: 'LOG' }).error, /tab/);
+  assert.match(app.ROUTINE_ACTIONS.addBlock({ ...EST, title: 'ESTERO' }).error, /GOOGLE ADS/);
+  sheets.Ciccio.getRange(20, 23).setValue('nota a mano');
+  assert.match(app.ROUTINE_ACTIONS.addBlock(EST).error, /non sono vuote/);
+  sheets.Ciccio.getRange(20, 23).setValue('');
+  sheets.Ciccio.getRange(4, 5).setFormula('');                                             // totale scritto a mano, senza formula
+  assert.match(app.ROUTINE_ACTIONS.addBlock(EST).error, /formula/);
+  assert.equal(sheets.Ciccio.getRange(13, 19).getValue(), '');
+  assert.equal(sheets.Ciccio.getRange(5, 5).getFormula(), '=E30+N30');
+  assert.equal(sheets.LOG.values.length, 1);
 });

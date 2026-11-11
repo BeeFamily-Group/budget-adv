@@ -2,7 +2,7 @@
 
 Lo script `rhythm-google-ads.js` sostituisce l'inserimento a mano dei numeri Google nella dashboard Rhythm.
 
-Ogni notte, per ognuno dei 20 blocchi Google dello Sheet "_BUDGET CLIENTI 2027", legge:
+Ogni notte, per ognuno dei 21 blocchi Google dello Sheet "_BUDGET CLIENTI 2027", legge:
 - speso del mese;
 - conversioni;
 - budget giornaliero delle campagne attive;
@@ -18,7 +18,7 @@ Il periodo va dal primo del mese a ieri, come per i dati Meta. Il primo del mese
 2. Incollare tutto il contenuto di `rhythm-google-ads.js`.
 3. In `CONFIG`:
    - `CODICE` (riga 17): il codice personale con cui Marco accede alla dashboard, al posto di `INCOLLA_QUI_IL_TUO_CODICE`, tra gli apici;
-   - in `BLOCCHI` c'è una riga per ogni blocco Google: l'ID cliente Google Ads della struttura va nel campo `account`, tra gli apici, nel formato `123-456-7890`. Un ID per riga, niente elenchi. Cristallo, Sardinia e Trieste hanno due righe: lo stesso ID in tutte e due. I blocchi senza account vengono saltati; `channel_id` e `title` restano come sono.
+   - in `BLOCCHI` c'è una riga per ogni blocco Google: l'ID cliente Google Ads della struttura va nel campo `account`, tra gli apici, nel formato `123-456-7890`. Un ID per riga, niente elenchi. Albatros, Cristallo, Sardinia e Trieste hanno due righe: lo stesso ID in tutte e due. I blocchi senza account vengono saltati; `channel_id` e `title` restano come sono.
 
    Esempio: `{ channel_id: 'El Cid|J', title: 'BUDGET GOOGLE ADS', account: '123-456-7890', campagne: [] },`
 
@@ -32,7 +32,7 @@ Le campagne che vanno nel secondo blocco hanno un'etichetta tra parentesi quadre
 
 | Etichetta | Struttura | Blocco |
 |---|---|---|
-| `[ESTERO]` | Cristallo (poi Albatros e Rivamare) | Google estero |
+| `[ESTERO]` | Albatros, Cristallo (poi Rivamare) | Google estero |
 | `[BARCA]` | Sardinia | gommone |
 | `[GAS]` | Trieste | GAS |
 

@@ -225,3 +225,62 @@ test('conferma di una proposta: mese e €/giorno visti da chi conferma', () => 
   assert.equal(L.validatePayload('confirmPlan', { ym: '2027-01' }), '€/giorno non valido');
   assert.equal(L.validatePayload('confirmPlan', { ym: '2027-13', eur: 30 }), 'mese non valido');
 });
+
+// Blocco nuovo in un tab cliente (azione di routine addBlock, 11/11: Albatros Google estero).
+test('lettere di colonna → numero', () => {
+  assert.equal(L.colIndex('A'), 1);
+  assert.equal(L.colIndex('S'), 19);
+  assert.equal(L.colIndex('AA'), 27);
+  assert.equal(L.colLetter(L.colIndex('AB')), 'AB');
+});
+
+test('blocco nuovo: griglia dalla riga 9 alla 32, mesi interi, formule sulle colonne nuove', () => {
+  const g = L.newBlockGrid(19, 'ESTERO GOOGLE ADS', { year: 2026, programmed: 4500, spent: 4589 });   // S = 19
+  assert.equal(g.length, 24);
+  assert.ok(g.every(r => r.length === 7));
+  assert.deepEqual(g[0], ['', 2026, 2027, '', '', '', '']);                                   // riga 9
+  assert.deepEqual(g[1], ['Programmato', 4500, '=V30', '', '', '', '']);
+  assert.deepEqual(g[2], ['Investito', 4589, '=W30', '', '', '', '']);
+  assert.deepEqual(g[3], ['', '', '', '', '', '', '']);
+  assert.deepEqual(g[4], ['ESTERO GOOGLE ADS - metodo di pagamento:', '', '', '', '', '', '']);  // riga 13
+  assert.deepEqual(g[5], ['Mese', 'Giorni', '€ / Giorno', '€ Programmati', 'Spesa Effettiva', 'Δ (Spesa - Prog.)', 'Note']);
+  assert.deepEqual(g[6], ['Ottobre 2026', 31, '', '=U15*T15', '', '=IF(W15="","",W15-V15)', '']);   // riga 15
+  assert.deepEqual(g[10].slice(0, 2), ['Febbraio 2027', 28]);
+  assert.deepEqual(g[20].slice(0, 4), ['Dicembre 2027', 31, '', '=U29*T29']);
+  assert.deepEqual(g[21], ['TOTALE', '', '', '=SUM(V15:V29)', '=SUM(W15:W29)', '=W30-V30', '']);
+  assert.deepEqual(g[22], ['di cui ott–dic 2026', '', '', '=SUM(V15:V17)', '=SUM(W15:W17)', '', '']);
+  assert.deepEqual(g[23], ['di cui gen–dic 2027', '', '', '=SUM(V18:V29)', '=SUM(W18:W29)', '', '']);
+  // la dashboard ritrova il blocco e l'anno precedente
+  const grid = Array.from({ length: 32 }, () => Array(25).fill(''));
+  g.forEach((row, i) => row.forEach((v, j) => { grid[8 + i][18 + j] = v; }));
+  assert.deepEqual(L.findBlocks(grid).map(b => [b.letter, b.kind, b.title]), [['S', 'google', 'ESTERO GOOGLE ADS']]);
+  assert.deepEqual(L.readPrevYear(grid, 19), { year: 2026, programmed: 4500, spent: 4589 });
+});
+
+test('blocco nuovo senza anno precedente: niente confronto', () => {
+  const g = L.newBlockGrid(19, 'ESTERO GOOGLE ADS');
+  assert.deepEqual(g[0], ['', '', '', '', '', '', '']);
+  assert.deepEqual(g[1], ['Programmato', '', '=V30', '', '', '', '']);
+});
+
+test('totale in testa al tab: il blocco nuovo si aggiunge una volta sola', () => {
+  assert.equal(L.extendTotal('=D30+M30', 'V30'), '=D30+M30+V30');
+  assert.equal(L.extendTotal('=D30+M30+V30', 'V30'), '=D30+M30+V30');
+  assert.throws(() => L.extendTotal('', 'V30'), /formula/);
+  assert.throws(() => L.extendTotal(84220, 'V30'), /formula/);
+});
+
+test('controlli di addBlock', () => {
+  const ok = { reason: 'Albatros estero', tab: 'Albatros', from_letter: 'J', to_letter: 'S', title: 'ESTERO GOOGLE ADS',
+               prev: { year: 2026, programmed: 4500, spent: 4589 } };
+  assert.equal(L.validateAddBlock(ok), '');
+  assert.equal(L.validateAddBlock({ ...ok, prev: undefined }), '');
+  assert.match(L.validateAddBlock({ ...ok, reason: '' }), /motivo/);
+  assert.match(L.validateAddBlock({ ...ok, tab: '' }), /tab/);
+  assert.match(L.validateAddBlock({ ...ok, to_letter: 's1' }), /colonna/);
+  assert.match(L.validateAddBlock({ ...ok, from_letter: '' }), /colonna/);
+  assert.match(L.validateAddBlock({ ...ok, title: 'ESTERO' }), /GOOGLE ADS/);
+  assert.match(L.validateAddBlock({ ...ok, title: 'ESTERO GOOGLE ADS - metodo di pagamento:' }), /titolo/);
+  assert.match(L.validateAddBlock({ ...ok, prev: { year: 26, programmed: 1, spent: 1 } }), /anno/);
+  assert.match(L.validateAddBlock({ ...ok, prev: { year: 2026, programmed: -1, spent: 1 } }), /importo/);
+});
