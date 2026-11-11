@@ -3,6 +3,8 @@
 // subito (è già visibile nell'HTML) e resta almeno 5 s anche se i dati arrivano prima; se tardano, resta fino
 // al loro arrivo. Solo alla prima apertura: i ricaricamenti dopo un salvataggio non la mostrano.
 
+import { greeting, romeHour, rememberedName } from './greeting.js';
+
 // Logica dei tempi, separata dal DOM per poterla provare in node. Con delay 0 la schermata parte subito.
 export function splashTimer({ show, hide, now, setTimer, clearTimer, delay = 0, minVisible = 5000 }) {
   let timer = null;
@@ -29,6 +31,20 @@ export function splashTimer({ show, hide, now, setTimer, clearTimer, delay = 0, 
 }
 
 const MESSAGES = ['Leggo il piano…', 'Conto la spesa di ieri…', 'Allineo Meta e Google…', 'Quasi fatto…'];
+
+function paintGreeting(el) {
+  if (!el) return;
+  let store = null;
+  try { store = localStorage; } catch { /* niente nome */ }
+  const g = greeting(romeHour(new Date()), rememberedName(store));
+  const emo = document.createElement('span');
+  emo.className = 'emo';
+  emo.setAttribute('aria-hidden', 'true');
+  emo.textContent = g.emoji;
+  el.textContent = `${g.text} `;
+  el.appendChild(emo);
+  el.classList.add('in');
+}
 const EXIT_MS = 450;
 
 export function startSplash() {
@@ -44,6 +60,7 @@ export function startSplash() {
 
   function show() {
     let i = 0;
+    paintGreeting(el.querySelector('.splash-greet'));
     msg.textContent = MESSAGES[0];
     body.classList.add('splash-on', 'splash-mini-off');
     el.hidden = false;

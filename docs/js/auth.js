@@ -1,9 +1,13 @@
 // Codice personale: si salva in questo browser e la web app restituisce il ruolo.
 import { post } from './api.js';
 import { store, render, esc } from './app.js';
+import { rememberRole } from './greeting.js';
 
 const KEY = 'budget-adv-code';
 const LABEL = { francesco: 'Francesco · Meta', marco: 'Marco · Google', ambra: 'Ambra · proposte' };
+
+// Il ruolo resta nel browser per salutare per nome sulla schermata gialla (js/greeting.js).
+function storage() { try { return localStorage; } catch { return null; } }
 
 function saved() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }
 function save(code) { try { code ? localStorage.setItem(KEY, code) : localStorage.removeItem(KEY); } catch { /* niente */ } }
@@ -24,7 +28,8 @@ export async function restore() {
   }
   store.code = r.ok ? code : null;
   store.role = r.ok ? r.role : null;
-  if (r.error === 'codice non valido') save('');
+  if (r.ok) rememberRole(storage(), r.role);
+  if (r.error === 'codice non valido') { save(''); rememberRole(storage(), null); }
   paintButton();
   render();
 }
@@ -44,7 +49,7 @@ export function openLogin() {
   const close = () => { d.hidden = true; d.innerHTML = ''; };
   d.querySelector('#close').addEventListener('click', close);
   const out = d.querySelector('#logout');
-  if (out) out.addEventListener('click', () => { save(''); store.role = null; store.code = null; paintButton(); render(); close(); });
+  if (out) out.addEventListener('click', () => { save(''); rememberRole(storage(), null); store.role = null; store.code = null; paintButton(); render(); close(); });
   d.querySelector('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const code = d.querySelector('#code').value.trim().toUpperCase();
@@ -54,6 +59,7 @@ export function openLogin() {
       return;
     }
     save(code);
+    rememberRole(storage(), r.role);
     store.code = code;
     store.role = r.role;
     paintButton();
