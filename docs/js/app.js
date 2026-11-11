@@ -4,6 +4,7 @@ import { buildCards, channelLabel, stateLabel, staleAccounts, staleText, macLate
 import { fmtEur } from './calc.js';
 import { icon } from './icons.js';
 import { mountTrend } from './trend.js';
+import { startSplash } from './splash.js';
 
 export const store = { state: null, meta: null, storico: null, names: null, ym: null, asOf: null, today: null, q: '', onlyOff: false, role: null, code: null };
 
@@ -158,7 +159,9 @@ function init() {
     try { (await import('./auth.js')).openLogin(); } catch (e) { console.error(e); }
   });
   document.body.classList.add('first-paint');
+  const splash = startSplash();
   reload()
+    .finally(() => splash.done())
     .then(() => { setTimeout(() => document.body.classList.remove('first-paint'), 700); return import('./auth.js').then(m => m.restore()); })
     .catch((e) => { console.error(e); $('count').textContent = `Dati non disponibili (${e.message}): riprova tra poco.`; });
 }
