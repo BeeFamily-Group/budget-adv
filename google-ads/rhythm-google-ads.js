@@ -21,14 +21,16 @@ var CONFIG = {
   // account: ID cliente Google Ads nel formato 123-456-7890 (vuoto = blocco saltato).
   // campagne: frammenti del nome delle campagne da contare (vuoto = tutte le campagne dell'account).
   // escludi: frammenti del nome delle campagne da non contare. Maiuscole e minuscole indifferenti.
+  // Standard per gli account con due blocchi: etichetta all'inizio del nome della campagna,
+  // [ESTERO], [BARCA] o [GAS]. Le campagne senza etichetta vanno nel blocco principale.
   BLOCCHI: [
     { channel_id: 'Albatros|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'Arianna|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'B612|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'Ciccio|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
-    // Cristallo ha due blocchi: Google Italia ed estero. Da verificare il frammento usato nei nomi delle campagne estere.
-    { channel_id: 'Cristallo|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [], escludi: ['estero'] },
-    { channel_id: 'Cristallo|S', title: 'ESTERO GOOGLE ADS', account: '', campagne: ['estero'] },
+    // Cristallo ha due blocchi: Google Italia ed estero. Le campagne estere hanno [ESTERO] nel nome.
+    { channel_id: 'Cristallo|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [], escludi: ['[estero]'] },
+    { channel_id: 'Cristallo|S', title: 'ESTERO GOOGLE ADS', account: '', campagne: ['[estero]'] },
     { channel_id: 'DeltaBlu|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'El Cid|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'Helios|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
@@ -37,14 +39,14 @@ var CONFIG = {
     { channel_id: 'Mexico|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'Olimpic|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'Rivamare|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
-    // Sardinia ha due blocchi: ville e barca (gommone). Da verificare i frammenti nei nomi delle campagne.
-    { channel_id: 'Sardinia|A', title: 'BUDGET GOOGLE ADS · VILLE', account: '', campagne: ['vill'] },
-    { channel_id: 'Sardinia|J', title: 'BUDGET GOOGLE ADS · BARCA', account: '', campagne: ['barca', 'gommone'] },
+    // Sardinia ha due blocchi: ville e barca (gommone). Le campagne del gommone hanno [BARCA] nel nome.
+    { channel_id: 'Sardinia|A', title: 'BUDGET GOOGLE ADS · VILLE', account: '', campagne: [], escludi: ['[barca]'] },
+    { channel_id: 'Sardinia|J', title: 'BUDGET GOOGLE ADS · BARCA', account: '', campagne: ['[barca]'] },
     { channel_id: 'Sogno|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
     { channel_id: 'Teti|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [] },
-    // Trieste ha due blocchi: Google e GAS. Da verificare quali campagne vanno su GAS.
-    { channel_id: 'Trieste|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [], escludi: ['gas'] },
-    { channel_id: 'Trieste|S', title: 'GAS GOOGLE ADS', account: '', campagne: ['gas'] },
+    // Trieste ha due blocchi: Google e GAS. Le campagne GAS hanno [GAS] nel nome.
+    { channel_id: 'Trieste|J', title: 'BUDGET GOOGLE ADS', account: '', campagne: [], escludi: ['[gas]'] },
+    { channel_id: 'Trieste|S', title: 'GAS GOOGLE ADS', account: '', campagne: ['[gas]'] },
   ],
 };
 

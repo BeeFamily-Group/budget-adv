@@ -17,12 +17,26 @@ Il periodo va dal primo del mese a ieri, come per i dati Meta. Il primo del mese
 1. Strumenti → Azioni collettive → Script → **+** (nuovo script).
 2. Incollare tutto il contenuto di `rhythm-google-ads.js`.
 3. In `CONFIG`:
-   - `CODICE`: il codice personale con cui Marco accede alla dashboard;
-   - per ogni blocco, in `account`, l'ID cliente Google Ads della struttura (formato `123-456-7890`). I blocchi senza account vengono saltati;
-   - per le strutture con due blocchi nello stesso account (Cristallo Google/estero, Sardinia ville/barca, Trieste Google/GAS), le parole del nome delle campagne in `campagne` ed `escludi`. Quelle già scritte sono una proposta da verificare.
+   - `CODICE` (riga 17): il codice personale con cui Marco accede alla dashboard, al posto di `INCOLLA_QUI_IL_TUO_CODICE`, tra gli apici;
+   - in `BLOCCHI` c'è una riga per ogni blocco Google: l'ID cliente Google Ads della struttura va nel campo `account`, tra gli apici, nel formato `123-456-7890`. Un ID per riga, niente elenchi. Cristallo, Sardinia e Trieste hanno due righe: lo stesso ID in tutte e due. I blocchi senza account vengono saltati; `channel_id` e `title` restano come sono.
+
+   Esempio: `{ channel_id: 'El Cid|J', title: 'BUDGET GOOGLE ADS', account: '123-456-7890', campagne: [] },`
+
 4. **Anteprima** con `ANTEPRIMA: true`: alla prima esecuzione Google chiede di autorizzare lo script. Nel registro, per ogni blocco, compaiono speso, conversioni, budget e stato, senza inviare niente. Se una campagna finisce in due blocchi compare una riga "ATTENZIONE".
 5. Se i numeri tornano: `ANTEPRIMA: false` → **Esegui** una volta → controllo in dashboard.
 6. Frequenza: **ogni giorno**, la mattina presto (es. 6:00).
+
+## Standard dei nomi per gli account con due blocchi (11/11/2026)
+
+Le campagne che vanno nel secondo blocco hanno un'etichetta tra parentesi quadre all'inizio del nome:
+
+| Etichetta | Struttura | Blocco |
+|---|---|---|
+| `[ESTERO]` | Cristallo (poi Albatros e Rivamare) | Google estero |
+| `[BARCA]` | Sardinia | gommone |
+| `[GAS]` | Trieste | GAS |
+
+Le campagne senza etichetta vanno nel blocco principale (Google, ville). Maiuscole e minuscole indifferenti. Lo script è già configurato così.
 
 ## Cosa sapere
 

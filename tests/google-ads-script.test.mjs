@@ -90,6 +90,25 @@ test('la configurazione precompilata copre i 20 blocchi Google dello Sheet, acco
   assert.equal(S.CONFIG.CODICE, 'INCOLLA_QUI_IL_TUO_CODICE');
 });
 
+// Standard concordato con Marco (11/11): etichetta tra parentesi quadre nel nome della campagna.
+// Senza etichetta la campagna va nel blocco principale, così nessuna resta fuori.
+test('standard etichette: [ESTERO], [BARCA], [GAS] nel nome; senza etichetta nel blocco principale', () => {
+  const B = Object.fromEntries(S.CONFIG.BLOCCHI.map(b => [b.channel_id, b]));
+  const dove = (ids, nome) => ids.filter(id => S.abbina(B[id], nome));
+  const CR = ['Cristallo|J', 'Cristallo|S'], SA = ['Sardinia|A', 'Sardinia|J'], TR = ['Trieste|J', 'Trieste|S'];
+  const casi = [
+    [CR, 'Cristallo Search IT', ['Cristallo|J']],
+    [CR, '[ESTERO] Cristallo DE', ['Cristallo|S']],
+    [SA, 'Sardinia Ville Search', ['Sardinia|A']],
+    [SA, 'Sardinia PMax', ['Sardinia|A']],
+    [SA, '[BARCA] Gommone Sardegna', ['Sardinia|J']],
+    [TR, 'Trieste Gastronomia', ['Trieste|J']],
+    [TR, '[GAS] Trieste', ['Trieste|S']],
+    [TR, '[gas] trieste minuscolo', ['Trieste|S']],
+  ];
+  for (const [ids, nome, atteso] of casi) assert.deepEqual(dove(ids, nome), atteso, nome);
+});
+
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
@@ -106,9 +125,9 @@ test('giro completo: legge l\'account, separa i blocchi e invia a saveGoogle con
     AdsManagerApp: { accounts: () => ({ withIds: (ids) => ({ get: () => iter(ids.includes('111-222-3333') ? [account] : []) }) }), select: () => {} },
     AdsApp: { search: (q) => iter(q.includes('segments.date')
       ? [{ campaign: { name: 'Cristallo Search IT' }, metrics: { costMicros: '120500000', conversions: 4.4 } },
-         { campaign: { name: 'Cristallo Estero DE' }, metrics: { costMicros: '80000000', conversions: 1 } }]
+         { campaign: { name: '[ESTERO] Cristallo DE' }, metrics: { costMicros: '80000000', conversions: 1 } }]
       : [{ campaign: { name: 'Cristallo Search IT', status: 'ENABLED', servingStatus: 'SERVING' }, campaignBudget: { resourceName: 'b1', period: 'DAILY', amountMicros: '15000000' } },
-         { campaign: { name: 'Cristallo Estero DE', status: 'ENABLED', servingStatus: 'SERVING' }, campaignBudget: { resourceName: 'b2', period: 'DAILY', amountMicros: '10000000' } }]) },
+         { campaign: { name: '[ESTERO] Cristallo DE', status: 'ENABLED', servingStatus: 'SERVING' }, campaignBudget: { resourceName: 'b2', period: 'DAILY', amountMicros: '10000000' } }]) },
     UrlFetchApp: { fetch: (url, opt) => { sent.push(JSON.parse(opt.payload)); return { getContentText: () => '{"ok":true,"sheet":"aggiornato"}', getResponseCode: () => 200 }; } },
   };
   vm.createContext(ctx);
