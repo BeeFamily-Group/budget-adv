@@ -28,6 +28,8 @@ case "${1:-}" in
     echo "speso nello Sheet: $($PY tools/routine_api.py spend docs/data/meta.json)"
     # ChatGPT Ads (dall'11/11, Color Holiday - Chatgpt ADS): solo lettura; un errore qui non ferma la pubblicazione Meta
     echo "chatgpt: $($PY tools/chatgpt.py 2>&1 || echo 'non letto')"
+    # TikTok Ads (dal 19/11, card "Color Holiday"): lettura Windsor del piano recuperata dalla trascrizione; un errore non ferma Meta
+    echo "tiktok: $($PY tools/tiktok.py --plan raw/plan.json --raw raw 2>&1 || echo 'non letto')"
     tools/publish.sh "$AS_OF"
     ;;
   *) echo "uso: $0 plan|finish"; exit 2 ;;

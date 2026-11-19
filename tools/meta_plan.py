@@ -9,6 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import accounts as accounts_mod  # noqa: E402
+import tiktok  # noqa: E402
 
 ROSTER = os.path.expanduser("~/Desktop/CLAUDE CODE/BEEFAMILY/DOWNLOAD FATTURE/_automation/roster_beefamily.json")
 
@@ -59,8 +60,9 @@ def build_plan(accounts, today=None, daily=True, targeting=()):
             "ad_account_id": acc, "level": "campaign", "limit": 1000, "time_range": rng, "time_increment": "1",
             "filtering": [{"field": "amount_spent", "operator": "GREATER_THAN", "value": ["0"]}],
             "fields": ["id", "name", "amount_spent", "lead"]}})
+    # TikTok Ads (19/11): letture Windsor.ai da fare con get_data, recuperate poi da tools/tiktok.py
     return {"run_id": new_run_id(), "as_of": until.isoformat(), "since": since.isoformat(), "until": until.isoformat(),
-            "calls": calls}
+            "calls": calls, "windsor_calls": tiktok.windsor_calls(today)}
 
 
 def main():

@@ -5,7 +5,7 @@ import {
 
 export function channelLabel(title) {
   const t = String(title).toUpperCase();
-  const base = t.includes('FACEBOOK') ? 'Meta' : (t.includes('CHATGPT') ? 'ChatGPT' : 'Google');
+  const base = t.includes('FACEBOOK') ? 'Meta' : t.includes('CHATGPT') ? 'ChatGPT' : t.includes('TIKTOK') ? 'TikTok' : 'Google';
   if (t.includes('ITALIA')) return `${base} Italia`;
   if (t.includes('ESTERO')) return `${base} estero`;
   if (t.includes('GAS')) return `${base} GAS`;
@@ -24,8 +24,8 @@ export function stateLabel(state, pct) {
   return 'nessun budget';
 }
 
-// Dati dei canali esterni a Meta: Google dal tab GOOGLE (Marco/script), ChatGPT dal tab CHATGPT (routine notturna).
-const extRows = (state, ch) => (ch.kind === 'chatgpt' ? state.chatgpt : state.google) || [];
+// Dati dei canali esterni a Meta: Google dal tab GOOGLE (Marco/script), ChatGPT e TikTok dai loro tab (routine notturna).
+const extRows = (state, ch) => ({ chatgpt: state.chatgpt, tiktok: state.tiktok }[ch.kind] || state.google) || [];
 
 const RANK = { over: 3, early: 3, under: 2, ok: 1, nodata: 0.6, notyet: 0.5, none: 0 };
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -287,9 +287,14 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
   const metaM = { spend: Math.round(sum(metaCh, c => c.spent) * 100) / 100, leads: sum(metaCh, c => sum(c.daily, d => d.leads)) };
   const googleM = { spend: sum(googleCh, c => c.spent), leads: sum(googleCh, c => c.leadsMtd) };
   // ChatGPT: la spesa entra nel totale, i clic restano a parte (non sono lead e falserebbero il costo per lead)
-  const gptCh = channels.filter(c => c.kind === 'chatgpt');
-  const chatgptM = gptCh.length ? { spend: round2(sum(gptCh, c => c.spent)), clicks: sum(gptCh, c => c.leadsMtd) } : null;
-  const total = { spend: round2(metaM.spend + googleM.spend + (chatgptM ? chatgptM.spend : 0)), leads: metaM.leads + googleM.leads };
+  const clickM = (kind) => {
+    const xs = channels.filter(c => c.kind === kind);
+    return xs.length ? { spend: round2(sum(xs, c => c.spent)), clicks: sum(xs, c => c.leadsMtd) } : null;
+  };
+  const chatgptM = clickM('chatgpt');
+  const tiktokM = clickM('tiktok');   // TikTok (19/11): come ChatGPT, clic e non lead
+  const total = { spend: round2(metaM.spend + googleM.spend + (chatgptM ? chatgptM.spend : 0) + (tiktokM ? tiktokM.spend : 0)),
+                  leads: metaM.leads + googleM.leads };
   total.cpl = total.leads > 0 ? Math.round((total.spend / total.leads) * 100) / 100 : null;
 
   const yms = s.channels[0].months.map(m => m.ym);
@@ -350,7 +355,7 @@ export function buildDetail(state, meta, tab, ym, asOf, role, today = asOf) {
     tab, ym, channels, plan, closing, notes,
     totals: planTotals(plan),
     prev: prevYearTotals(s),
-    results:{ month: { meta: metaM, google: googleM, chatgpt: chatgptM, total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf, today)[0].kpi7 },
+    results:{ month: { meta: metaM, google: googleM, chatgpt: chatgptM, ...(tiktokM ? { tiktok: tiktokM } : {}), total }, last7: buildCards({ ...state, structures: [s] }, meta, ym, asOf, today)[0].kpi7 },
     can: { editMeta: role === 'francesco', editGoogle: role === 'marco', note: Boolean(role), propose: role === 'ambra' },
   };
 }
@@ -438,13 +443,16 @@ export function updateLineHtml(u, kinds = ['meta', 'google']) {
     meta: u.meta ? `Meta aggiornato al <b>${dmyOf(u.meta)}</b> (automatico)` : 'Meta non ancora letto (automatico)',
     google: u.google ? `Google aggiornato al <b>${dmyOf(u.google)}</b> (manuale)` : 'Google non ancora inserito da Marco (manuale)',
     chatgpt: u.chatgpt ? `ChatGPT aggiornato al <b>${dmyOf(u.chatgpt)}</b> (automatico)` : 'ChatGPT non ancora letto (automatico)',
+    tiktok: u.tiktok ? `TikTok aggiornato al <b>${dmyOf(u.tiktok)}</b> (automatico)` : 'TikTok non ancora letto (automatico)',
   };
-  return ['meta', 'google', 'chatgpt'].filter(k => kinds.includes(k)).map(k => parts[k]).join(' · ');
+  return ['meta', 'google', 'chatgpt', 'tiktok'].filter(k => kinds.includes(k)).map(k => parts[k]).join(' · ');
 }
 
 export function updateDates(meta, state) {
   const last = (rows) => (rows || []).map(g => String(g.date || '').slice(0, 10)).filter(Boolean).sort().pop() || null;
-  return { meta: (meta && meta.as_of) || null, google: last(state.google), chatgpt: last(state.chatgpt) };
+  const out = { meta: (meta && meta.as_of) || null, google: last(state.google), chatgpt: last(state.chatgpt) };
+  if (state.tiktok) out.tiktok = last(state.tiktok);
+  return out;
 }
 
 // Report mensile per il cliente: solo speso del mese, programmato del mese dopo, speso sul totale del piano.

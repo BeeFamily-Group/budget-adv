@@ -6,6 +6,8 @@ var SERVICE_TABS = {
   GOOGLE: ['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author'],
   // ChatGPT Ads (11/11): stesse colonne di GOOGLE, scrive solo la routine notturna; leads_mtd = clic del mese.
   CHATGPT: ['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author'],
+  // TikTok Ads (19/11): stesse colonne, scrive solo la routine notturna (dati da Windsor.ai); leads_mtd = clic del mese.
+  TIKTOK: ['ts', 'channel_id', 'date', 'spent_mtd', 'leads_mtd', 'daily_budget', 'active', 'author'],
   'RICHIESTE META': ['id', 'channel_id', 'ym', 'eur', 'current_budget', 'apply_from', 'created_by', 'created_at', 'status', 'result', 'updated_at'],
   MAPPA: ['account_id', 'campaign_id', 'campaign_name', 'channel_id', 'channel_title'],
   GIORNI: ['channel_id', 'ym', 'start_day'],
@@ -131,6 +133,7 @@ function buildState() {
     notes: strip(rows('NOTE')),
     google: strip(rows('GOOGLE')),
     chatgpt: strip(rows('CHATGPT')),
+    tiktok: strip(rows('TIKTOK')),
     requests: strip(rows('RICHIESTE META')),
     mapping: strip(rows('MAPPA')),
     days: strip(rows('GIORNI')),
@@ -190,7 +193,7 @@ function lastSystemWrite(cellA1) {
   if (!SYS_WRITES) {
     SYS_WRITES = {};
     rows('LOG').forEach(function (r) {
-      if (r.action === 'writeSpend' || r.action === 'saveGoogle' || r.action === 'saveChatgpt') SYS_WRITES[r.cell] = r.after;
+      if (r.action === 'writeSpend' || r.action === 'saveGoogle' || r.action === 'saveChatgpt' || r.action === 'saveTiktok') SYS_WRITES[r.cell] = r.after;
     });
   }
   return Object.prototype.hasOwnProperty.call(SYS_WRITES, cellA1) ? SYS_WRITES[cellA1] : null;
@@ -434,6 +437,14 @@ var ROUTINE_ACTIONS = {
     var loc = locateChecked(b.channel_id, b.title);
     if (loc.block.kind !== 'chatgpt') return { ok: false, error: 'il blocco ' + b.channel_id + ' non è un blocco ChatGPT' };
     return saveChannelRow('routine', 'saveChatgpt', 'CHATGPT', b);
+  },
+  // Dati TikTok Ads della routine notturna (letti da Windsor.ai): speso del mese, clic come lead, stato.
+  saveTiktok: function (b) {
+    var bad = validatePayload('saveGoogle', b);
+    if (bad) return { ok: false, error: bad };
+    var loc = locateChecked(b.channel_id, b.title);
+    if (loc.block.kind !== 'tiktok') return { ok: false, error: 'il blocco ' + b.channel_id + ' non è un blocco TikTok' };
+    return saveChannelRow('routine', 'saveTiktok', 'TIKTOK', b);
   },
   // Etichette dei mesi diventate date nello Sheet: tornano testo, solo se ogni riga è il mese giusto (testo o data).
   fixMonthLabels: function (b) {

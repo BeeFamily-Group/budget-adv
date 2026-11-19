@@ -344,3 +344,15 @@ test('saveChatgpt e saveGoogle: ognuno solo sul suo canale', () => {
   assert.equal(app.USER_ACTIONS.saveGoogle('marco', { channel_id: 'Color Holiday - Chatgpt ADS|A', title: 'BUDGET CHATGPT ADS', ...data }).error, 'forbidden');
   assert.match(app.ROUTINE_ACTIONS.saveChatgpt({ channel_id: 'Color Holiday - Chatgpt ADS|A', title: 'BUDGET CHATGPT ADS', ...data, spent_mtd: -1 }).error, /speso/);
 });
+
+test('saveTiktok: la routine scrive speso e clic nel tab TIKTOK e nella Spesa Effettiva, solo su blocchi TikTok', () => {
+  const { app, sheets } = setupWithModel();
+  app.ROUTINE_ACTIONS.addTab({ ...NEW_TAB, tab: 'Color Holiday - TikTok ADS', header_title: 'ANNO 2027 · Color Holiday · TikTok ADS', block_title: 'BUDGET TIKTOK ADS' });
+  const ch = { channel_id: 'Color Holiday - TikTok ADS|A', title: 'BUDGET TIKTOK ADS' };
+  const r = app.ROUTINE_ACTIONS.saveTiktok({ ...ch, date: '2026-11-20', spent_mtd: 29.4, leads_mtd: 51, daily_budget: 0, active: true });
+  assert.equal(r.ok, true);
+  assert.deepEqual(plain(sheets.TIKTOK.values[1].slice(1)), ['Color Holiday - TikTok ADS|A', "'2026-11-20", 29.4, 51, 0, true, 'routine']);
+  assert.equal(sheets['Color Holiday - TikTok ADS'].getRange(16, 5).getValue(), 29.4);
+  assert.equal(app.buildState().tiktok.length, 1);
+  assert.match(app.ROUTINE_ACTIONS.saveTiktok({ ...GOOGLE, date: '2026-11-20', spent_mtd: 1, leads_mtd: 0, daily_budget: 0, active: true }).error, /TikTok/);
+});

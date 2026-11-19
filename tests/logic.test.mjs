@@ -324,3 +324,15 @@ test('validateAddTab: controlli prima di creare un tab cliente nuovo', () => {
   assert.match(L.validateAddTab({ ...ok, header_title: '' }), /titolo/);
   assert.match(L.validateAddTab({ ...ok, block_title: 'BUDGET TIKTOK' }), /ADS/);
 });
+
+// TikTok Ads (19/11): quarto canale, card "Color Holiday" (tab "Color Holiday - TikTok ADS").
+test('canale TikTok: riconosciuto dal titolo, lo gestisce Francesco, etichetta TikTok', () => {
+  const grid = Array.from({ length: 32 }, () => []);
+  grid[12][0] = 'BUDGET TIKTOK ADS - metodo di pagamento:';
+  assert.deepEqual(L.findBlocks(grid).map(b => [b.letter, b.kind, b.title]), [['A', 'tiktok', 'BUDGET TIKTOK ADS']]);
+  assert.equal(L.canEditChannel('francesco', 'tiktok'), true);
+  assert.equal(L.canEditChannel('marco', 'tiktok'), false);
+  assert.equal(L.channelShort('BUDGET TIKTOK ADS'), 'TikTok');
+  assert.equal(L.validateAddBlock({ reason: 'r', tab: 'T', from_letter: 'A', to_letter: 'J', title: 'BUDGET TIKTOK ADS' }), '');
+  assert.equal(L.validateAddTab({ reason: 'r', model_tab: 'M', tab: 'Color Holiday - TikTok ADS', header_title: 'T', block_title: 'BUDGET TIKTOK ADS' }), '');
+});

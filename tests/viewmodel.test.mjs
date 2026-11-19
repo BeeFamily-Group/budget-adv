@@ -517,3 +517,27 @@ test('date di aggiornamento: ChatGPT automatico, solo sulle strutture che lo han
   assert.equal(updateLineHtml({ meta: '2026-11-08', google: '2026-11-05', chatgpt: '2026-11-10' }),
     'Meta aggiornato al <b>08/11/2026</b> (automatico) · Google aggiornato al <b>05/11/2026</b> (manuale)');
 });
+
+// ---------- TikTok Ads (19/11): card "Color Holiday" ----------
+const TT_TAB = 'Color Holiday - TikTok ADS';
+const ttState = {
+  ...state,
+  structures: [...state.structures, { tab: TT_TAB, channels: [{ id: `${TT_TAB}|A`, kind: 'tiktok', title: 'BUDGET TIKTOK ADS',
+    months: gptMonths.map(m => ({ ...m, eur: m.ym === '2026-11' ? 30 : null, days: m.ym === '2026-11' ? 12 : null })), prev: null }] }],
+  tiktok: [{ channel_id: `${TT_TAB}|A`, date: '2026-11-13', spent_mtd: 0, leads_mtd: 0, daily_budget: 0, active: false }],
+};
+
+test('TikTok: etichetta, dati dal tab TIKTOK, clic fuori dai lead, riga di aggiornamento', () => {
+  assert.equal(channelLabel('BUDGET TIKTOK ADS'), 'TikTok');
+  const s = { ...ttState, tiktok: [{ ...ttState.tiktok[0], spent_mtd: 29.4, leads_mtd: 51 }] };
+  const c = buildCards(s, meta, '2026-11', '2026-11-14').find(x => x.tab === TT_TAB).channels[0];
+  assert.equal(c.kind, 'tiktok');
+  assert.equal(c.spent, 29.4);
+  assert.equal(c.leadsMtd, 51);
+  const d = buildDetail(s, meta, TT_TAB, '2026-11', '2026-11-14', 'francesco', '2026-11-14');
+  assert.deepEqual(d.results.month.tiktok, { spend: 29.4, clicks: 51 });
+  assert.equal(d.results.month.total.spend, 29.4);
+  assert.equal(d.results.month.total.leads, 0);
+  assert.equal(updateDates({ as_of: '2026-11-13' }, s).tiktok, '2026-11-13');
+  assert.equal(updateLineHtml({ tiktok: '2026-11-13' }, ['tiktok']), 'TikTok aggiornato al <b>13/11/2026</b> (automatico)');
+});

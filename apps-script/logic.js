@@ -47,6 +47,7 @@ function channelKind(title) {
   var t = String(title);
   if (/FACEBOOK/i.test(t)) return 'meta';
   if (/CHATGPT/i.test(t)) return 'chatgpt';
+  if (/TIKTOK/i.test(t)) return 'tiktok';   // dal 19/11, Color Holiday - TikTok ADS
   return 'google';
 }
 
@@ -120,7 +121,7 @@ function roleFromCode(code, hashes, hasher) {
 }
 
 function canEditChannel(role, kind) {
-  return (role === 'francesco' && (kind === 'meta' || kind === 'chatgpt')) || (role === 'marco' && kind === 'google');
+  return (role === 'francesco' && (kind === 'meta' || kind === 'chatgpt' || kind === 'tiktok')) || (role === 'marco' && kind === 'google');
 }
 
 function canWriteNote(role, author) {
@@ -139,7 +140,7 @@ function planWriteMode(role, kind, ym, nowYm) {
 function channelShort(title) {
   var t = String(title).toUpperCase();
   var kind = channelKind(t);
-  var base = kind === 'meta' ? 'Meta' : (kind === 'chatgpt' ? 'ChatGPT' : 'Google');
+  var base = { meta: 'Meta', chatgpt: 'ChatGPT', tiktok: 'TikTok' }[kind] || 'Google';
   var tags = [['ITALIA', 'Italia'], ['ESTERO', 'estero'], ['GAS', 'GAS'], ['VILLE', 'ville'], ['BARCA', 'barca']];
   for (var i = 0; i < tags.length; i++) if (t.indexOf(tags[i][0]) !== -1) return base + ' ' + tags[i][1];
   return base;
@@ -370,7 +371,7 @@ function labelMatches(v, ym) {
 }
 
 var COL_RE = /^[A-Z]{1,2}$/;
-var ADS_TITLE_RE = /(GOOGLE|FACEBOOK|CHATGPT) ADS$/;
+var ADS_TITLE_RE = /(GOOGLE|FACEBOOK|CHATGPT|TIKTOK) ADS$/;
 function validateAddBlock(b) {
   b = b || {};
   if (!given(b.reason)) return 'manca il motivo';
@@ -378,7 +379,7 @@ function validateAddBlock(b) {
   if (!COL_RE.test(String(b.from_letter || '')) || !COL_RE.test(String(b.to_letter || ''))) return 'colonna non valida (lettere maiuscole, es. S)';
   var t = String(b.title || '').trim();
   if (/metodo/i.test(t)) return 'titolo senza " - metodo di pagamento": lo aggiunge la web app';
-  if (!ADS_TITLE_RE.test(t)) return 'il titolo finisce con GOOGLE ADS, FACEBOOK ADS o CHATGPT ADS';
+  if (!ADS_TITLE_RE.test(t)) return 'il titolo finisce con GOOGLE ADS, FACEBOOK ADS, CHATGPT ADS o TIKTOK ADS';
   if (b.prev) {
     if (!isIntIn(b.prev.year, 2020, 2100)) return 'anno precedente non valido';
     if (!isAmount(b.prev.programmed) || !isAmount(b.prev.spent)) return "importo dell'anno precedente non valido";
@@ -396,7 +397,7 @@ function validateAddTab(b) {
   if (!String(b.header_title || '').trim()) return 'manca il titolo in A1';
   var t = String(b.block_title || '').trim();
   if (/metodo/i.test(t)) return 'titolo senza " - metodo di pagamento": lo aggiunge la web app';
-  if (!ADS_TITLE_RE.test(t)) return 'il titolo del blocco finisce con GOOGLE ADS, FACEBOOK ADS o CHATGPT ADS';
+  if (!ADS_TITLE_RE.test(t)) return 'il titolo del blocco finisce con GOOGLE ADS, FACEBOOK ADS, CHATGPT ADS o TIKTOK ADS';
   if (b.prev) {
     if (!isIntIn(b.prev.year, 2020, 2100)) return 'anno precedente non valido';
     if (!isAmount(b.prev.programmed) || !isAmount(b.prev.spent)) return "importo dell'anno precedente non valido";
