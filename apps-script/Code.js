@@ -430,6 +430,21 @@ var ROUTINE_ACTIONS = {
     log('routine · ' + String(b.reason).slice(0, 60), 'addTab', name + '!A13', b.model_tab, title);
     return { ok: true, channel_id: channelId(name, 'A') };
   },
+  // Cancella un tab cliente (19/11: i due tab Color Holiday ChatGPT e TikTok, unificati in "Color Holiday - Rete ADS").
+  // Serve il nome ripetuto in "confirm"; mai un tab di servizio. Lo Sheet tiene comunque la cronologia delle versioni.
+  deleteTab: function (b) {
+    b = b || {};
+    if (!String(b.reason || '').trim()) return { ok: false, error: 'manca il motivo' };
+    var name = String(b.tab || '').trim();
+    if (!name || String(b.confirm || '') !== name) return { ok: false, error: 'conferma mancante: ripeti il nome del tab in confirm' };
+    if (SERVICE_TABS[name]) return { ok: false, error: 'tab di servizio: non si cancella' };
+    var ss = SpreadsheetApp.getActive();
+    var sh = ss.getSheetByName(name);
+    if (!sh) return { ok: false, error: 'tab sconosciuto: ' + name };
+    ss.deleteSheet(sh);
+    log('routine · ' + String(b.reason).slice(0, 60), 'deleteTab', name, '', '');
+    return { ok: true, deleted: name };
+  },
   // Dati ChatGPT Ads della routine notturna (speso del mese, clic come lead, budget giornaliero, stato).
   saveChatgpt: function (b) {
     var bad = validatePayload('saveGoogle', b);

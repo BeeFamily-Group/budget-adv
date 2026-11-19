@@ -19,7 +19,8 @@ OPENAI_ADS = os.path.expanduser("~/bin/openai-ads")
 # Un blocco per riga. service = voce del Portachiavi con la chiave dell'ad account (una chiave = un account).
 # Senza "campaigns" si contano tutte le campagne dell'account.
 CHANNELS = [
-    {"channel_id": "Color Holiday - Chatgpt ADS|A", "title": "BUDGET CHATGPT ADS", "service": "openai-ads-api"},
+    # dal 19/11 ChatGPT e TikTok di Color Holiday stanno nello stesso tab "Color Holiday - Rete ADS" (ChatGPT in A)
+    {"channel_id": "Color Holiday - Rete ADS|A", "title": "BUDGET CHATGPT ADS", "service": "openai-ads-api"},
 ]
 
 

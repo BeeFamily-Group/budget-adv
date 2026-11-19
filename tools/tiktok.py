@@ -17,7 +17,8 @@ import harvest_meta  # noqa: E402
 
 # Un blocco per riga: account TikTok Ads (come lo vede Windsor.ai) e blocco dello Sheet.
 CHANNELS = [
-    {"account": "7709484493702447105", "channel_id": "Color Holiday - TikTok ADS|A", "title": "BUDGET TIKTOK ADS"},
+    # dal 19/11 nello stesso tab di ChatGPT, "Color Holiday - Rete ADS" (TikTok in J)
+    {"account": "7709484493702447105", "channel_id": "Color Holiday - Rete ADS|J", "title": "BUDGET TIKTOK ADS"},
 ]
 TITLES = {c["channel_id"]: c["title"] for c in CHANNELS}
 FIELDS = ["date", "spend", "clicks", "impressions"]

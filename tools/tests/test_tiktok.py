@@ -16,7 +16,7 @@ ACC = "7709484493702447105"
 class Calls(unittest.TestCase):
     def test_call_from_first_of_month_to_yesterday(self):
         calls = tiktok.windsor_calls(datetime.date(2026, 11, 20))
-        self.assertEqual(calls, [{"key": "tiktok_" + ACC, "channel_id": "Color Holiday - TikTok ADS|A", "args": {
+        self.assertEqual(calls, [{"key": "tiktok_" + ACC, "channel_id": "Color Holiday - Rete ADS|J", "args": {
             "connector": "tiktok", "accounts": [ACC], "fields": ["date", "spend", "clicks", "impressions"],
             "date_from": "2026-11-01", "date_to": "2026-11-19"}}])
 
@@ -79,7 +79,7 @@ class Payload(unittest.TestCase):
         rows = [{"date": "2026-11-19", "spend": 18.2, "clicks": 30}, {"date": "2026-11-18", "spend": "11.2", "clicks": "21"},
                 {"date": "2026-10-31", "spend": 50, "clicks": 9}]
         p = tiktok.payload(self.CALL, rows)
-        self.assertEqual(p, {"channel_id": "Color Holiday - TikTok ADS|A", "title": "BUDGET TIKTOK ADS", "date": "2026-11-19",
+        self.assertEqual(p, {"channel_id": "Color Holiday - Rete ADS|J", "title": "BUDGET TIKTOK ADS", "date": "2026-11-19",
                              "spent_mtd": 29.4, "leads_mtd": 51, "daily_budget": 0, "active": True})
 
     def test_no_rows_is_zero_and_not_active(self):

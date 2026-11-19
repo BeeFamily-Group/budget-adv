@@ -82,6 +82,7 @@ function setupApp() {
     _rename: (from, to) => { sheets[to] = sheets[from]; delete sheets[from]; order[order.indexOf(from)] = to; },
     insertSheet: (n, idx) => { const sh = new FakeSheet(n, []); sheets[n] = sh; order.splice(idx, 0, n); sh._ss = ss; return sh; },
     setActiveSheet: (sh) => { active = sh; return sh; },
+    deleteSheet: (sh) => { delete sheets[sh.name]; order.splice(order.indexOf(sh.name), 1); },
     moveActiveSheet: (pos) => { order.splice(order.indexOf(active.name), 1); order.splice(pos - 1, 0, active.name); },
     _order: order,
   };
@@ -355,4 +356,21 @@ test('saveTiktok: la routine scrive speso e clic nel tab TIKTOK e nella Spesa Ef
   assert.equal(sheets['Color Holiday - TikTok ADS'].getRange(16, 5).getValue(), 29.4);
   assert.equal(app.buildState().tiktok.length, 1);
   assert.match(app.ROUTINE_ACTIONS.saveTiktok({ ...GOOGLE, date: '2026-11-20', spent_mtd: 1, leads_mtd: 0, daily_budget: 0, active: true }).error, /TikTok/);
+});
+
+// Unificazione ChatGPT + TikTok (19/11): i due tab vecchi si cancellano solo con il nome ripetuto in "confirm".
+test('deleteTab: cancella un tab cliente solo con conferma del nome; mai un tab di servizio', () => {
+  const { app, sheets } = setupWithModel();
+  app.ROUTINE_ACTIONS.addTab(NEW_TAB);
+  const tab = 'Color Holiday - Chatgpt ADS';
+  assert.match(app.ROUTINE_ACTIONS.deleteTab({ reason: 'r', tab }).error, /conferma/);
+  assert.match(app.ROUTINE_ACTIONS.deleteTab({ reason: 'r', tab, confirm: 'altro' }).error, /conferma/);
+  assert.match(app.ROUTINE_ACTIONS.deleteTab({ reason: 'r', tab: 'GOOGLE', confirm: 'GOOGLE' }).error, /servizio/);
+  assert.match(app.ROUTINE_ACTIONS.deleteTab({ reason: 'r', tab: 'Nessuno', confirm: 'Nessuno' }).error, /sconosciuto/);
+  assert.match(app.ROUTINE_ACTIONS.deleteTab({ tab, confirm: tab }).error, /motivo/);
+  assert.ok(sheets[tab]);
+  assert.deepEqual(plain(app.ROUTINE_ACTIONS.deleteTab({ reason: 'unificazione', tab, confirm: tab })), { ok: true, deleted: tab });
+  assert.equal(sheets[tab], undefined);
+  assert.equal(app.SpreadsheetApp.getActive()._order.includes(tab), false);
+  assert.deepEqual(plain(sheets.LOG.values.at(-1).slice(2, 4)), ['deleteTab', tab]);
 });
